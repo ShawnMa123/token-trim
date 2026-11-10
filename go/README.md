@@ -169,6 +169,25 @@ Go 1.25.14 交叉编译出的 `windows/amd64` 二进制已在本机 Windows 10 �
 
 **未验证**：Windows 上的 Go 1.25 运行验证（仅交叉编译）、真实 Codex PreToolUse 端到端与权限矩阵、pytest 真实环境（本机未安装，未自动安装）、精确 tokenizer 收益、公司机器上的性能 gate。`gain` 的 token 为 `ceil(bytes/4)` 估算，不是账单。
 
+## 与原版 RTK 的基准对比
+
+在隔离容器内用 Codex CLI 0.163.0 + 本地 magpie `my-qoder-local/DeepSeek-Flash`
+对 `baseline`、`rtk-go`、原版 RTK 0.49.0（本仓库 `rtk/` 源码构建）做三组
+A/B/C：常规查询、高熵查询、失败/diff，各 6 轮。完整方法、原始数据和限制见
+[`test/e2e/codex-token-savings/RESULTS.md`](../test/e2e/codex-token-savings/RESULTS.md)。
+
+| 套件 | rtk-go token | 原版 RTK token | rtk-go 工具字节 | 原版 RTK 工具字节 |
+|---|---:|---:|---:|---:|
+| 常规查询 | -3.1% | -20.2% | -28.7% | -65.8% |
+| 高熵查询 | -3.2% | -22.3% | -29.9% | -64.3% |
+| 失败 + diff | -0.4% | -16.8% | 0.0% | -67.8% |
+
+原版 RTK 的更高节省来自有损省略（rg 隐藏 400/600 条匹配、失败测试只留摘要、
+diff 只留变化行），rtk-go 按当前规格保留全部匹配/失败并整次回退。性能上
+rtk-go 的启动与 RSS 更低：tiny 命令 p95 开销约 +3.0~4.4 ms，原版约
++4.0~6.6 ms；rg 场景 p50 约 7.7~8.0 ms vs 11.3~12.1 ms。两者均低于
+Linux 20 ms 目标。
+
 ## 已知限制
 
 - 不支持 `.cmd/.bat/.ps1` 直接包装（明确 126），不注入 npm 参数。
