@@ -7,6 +7,21 @@ import (
 	"os"
 )
 
+// checkPrivateDir verifies owner-only permissions without changing them.
+func checkPrivateDir(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("data root is not a directory")
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("data root permissions are not owner-only")
+	}
+	return nil
+}
+
 // secureDir creates path and forces owner-only Unix permissions, regardless of
 // a permissive umask.
 func secureDir(path string) error {

@@ -50,6 +50,9 @@ type aceHeader struct {
 	AceSize  uint16
 }
 
+// checkPrivateDir verifies the DACL without changing it.
+func checkPrivateDir(path string) error { return verifyPrivateDACL(path) }
+
 // secureDir creates the data root and installs a protected DACL granting only
 // the current user, SYSTEM, and Administrators. Failure disables storage.
 func secureDir(path string) error {
@@ -139,7 +142,7 @@ func verifyPrivateDACL(path string) error {
 	if err != nil {
 		return err
 	}
-	var sd, dacl uintptr
+	var sd, dacl unsafe.Pointer
 	r, _, e := procGetNamedSecurityInfoW.Call(
 		uintptr(unsafe.Pointer(pathPtr)),
 		seFileObject,
@@ -152,14 +155,14 @@ func verifyPrivateDACL(path string) error {
 	if r != 0 {
 		return fmt.Errorf("GetNamedSecurityInfoW: %v (code %d)", e, r)
 	}
-	defer procLocalFree.Call(sd)
-	if dacl == 0 {
+	defer procLocalFree.Call(uintptr(sd))
+	if dacl == nil {
 		return fmt.Errorf("privacy: data root has no DACL")
 	}
 
 	var info aclSizeInformation
 	r, _, e = procGetAclInformation.Call(
-		dacl,
+		uintptr(dacl),
 		uintptr(unsafe.Pointer(&info)),
 		unsafe.Sizeof(info),
 		aclSizeInformationClass,
@@ -174,16 +177,16 @@ func verifyPrivateDACL(path string) error {
 	}
 	allowed := map[string]bool{userSIDStr: true, "S-1-5-18": true, "S-1-5-32-544": true}
 	for i := uint32(0); i < info.AceCount; i++ {
-		var ace uintptr
-		r, _, e := procGetAce.Call(dacl, uintptr(i), uintptr(unsafe.Pointer(&ace)))
+		var ace unsafe.Pointer
+		r, _, e := procGetAce.Call(uintptr(dacl), uintptr(i), uintptr(unsafe.Pointer(&ace)))
 		if r == 0 {
 			return fmt.Errorf("GetAce(%d): %v", i, e)
 		}
-		hdr := (*aceHeader)(unsafe.Pointer(ace))
+		hdr := (*aceHeader)(ace)
 		if hdr.AceType != accessAllowedAceType {
 			continue
 		}
-		sid := (*syscall.SID)(unsafe.Pointer(ace + 8))
+		sid := (*syscall.SID)(unsafe.Add(ace, 8))
 		s, err := sid.String()
 		if err != nil {
 			return fmt.Errorf("read ACE SID: %w", err)

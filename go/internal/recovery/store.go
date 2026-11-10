@@ -83,6 +83,31 @@ func (s *Store) Prepare() error {
 	return secureDir(s.Root)
 }
 
+// Check verifies an existing data root without creating or modifying it.
+// It returns false when the root does not exist yet.
+func (s *Store) Check() (bool, error) {
+	if s.Root == "" {
+		return false, nil
+	}
+	info, err := os.Lstat(s.Root)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return true, fmt.Errorf("data root is a link")
+	}
+	if !info.IsDir() {
+		return true, fmt.Errorf("data root is not a directory")
+	}
+	return true, checkPrivateDir(s.Root)
+}
+
 // NewID returns a fresh 128-bit invocation id.
 func NewID() (string, error) {
 	var b [16]byte
@@ -301,6 +326,9 @@ func (s *Store) Load(id string) (*Record, error) {
 func (s *Store) containedRunDir(id string) (string, error) {
 	rootReal, err := filepath.EvalSymlinks(s.Root)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", ErrNotFound
+		}
 		return "", err
 	}
 	dir := filepath.Join(s.runsDir(), id)
