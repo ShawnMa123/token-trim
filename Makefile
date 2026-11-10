@@ -26,6 +26,7 @@ race:
 check: test vet
 
 cross:
+	mkdir -p dist
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local go build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o dist/rtk-go-linux-amd64 ./cmd/rtk-go
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GOTOOLCHAIN=local go build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o dist/rtk-go-windows-amd64.exe ./cmd/rtk-go
 
