@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ShawnMa123/token-trim/go/internal/buildinfo"
-	"github.com/ShawnMa123/token-trim/go/internal/config"
-	"github.com/ShawnMa123/token-trim/go/internal/recovery"
-	"github.com/ShawnMa123/token-trim/go/internal/stats"
+	"github.com/ShawnMa123/token-trim/internal/buildinfo"
+	"github.com/ShawnMa123/token-trim/internal/config"
+	"github.com/ShawnMa123/token-trim/internal/recovery"
+	"github.com/ShawnMa123/token-trim/internal/stats"
 )
 
 func (a *App) recall(args []string) int {

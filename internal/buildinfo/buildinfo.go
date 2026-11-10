@@ -5,7 +5,7 @@ import "runtime"
 
 // Version is the release version. It can be overridden at build time with
 //
-//	go build -ldflags "-X github.com/ShawnMa123/token-trim/go/internal/buildinfo.Version=1.2.3"
+//	go build -ldflags "-X github.com/ShawnMa123/token-trim/internal/buildinfo.Version=1.2.3"
 var Version = "0.1.0"
 
 // Commit is the source revision, injected with -ldflags when available.

@@ -2,7 +2,7 @@
 # Run a balanced A/B/C token-savings test: baseline vs rtk-go vs original rtk.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(cd "$HERE/../../.." && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 TAG=${TAG:-rtk-go-codex-e2e}
 RUNS=${RUNS:-6}
 RESULTS="${RESULTS_DIR:-$HERE/results}"

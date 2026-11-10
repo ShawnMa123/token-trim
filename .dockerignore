@@ -1,2 +1,7 @@
 .git
-test/e2e/codex-token-savings/results*
+.gitignore
+*.exe
+rtk-go
+rtk-go.exe
+test/e2e/results*
+test/e2e/sessions

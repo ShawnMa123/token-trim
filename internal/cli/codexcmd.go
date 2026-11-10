@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ShawnMa123/token-trim/go/internal/codex"
-	"github.com/ShawnMa123/token-trim/go/internal/config"
+	"github.com/ShawnMa123/token-trim/internal/codex"
+	"github.com/ShawnMa123/token-trim/internal/config"
 )
 
 const (

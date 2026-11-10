@@ -2,7 +2,7 @@
 # Reproduce the complete rtk-go vs original RTK benchmark (sequential).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(cd "$HERE/../../.." && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 RUNS=${RUNS:-6}
 PYTEST_RUNS=${PYTEST_RUNS:-4}
 
@@ -17,4 +17,4 @@ RUNS=$RUNS ./run-fail.sh
 RUNS=$PYTEST_RUNS ./run-pytest.sh
 RUNS=3 ./run-fix.sh
 
-echo "done; see RESULTS.md and results*/ summaries"
+echo "done; see docs/benchmarks.md and local results*/ summaries"

@@ -14,12 +14,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ShawnMa123/token-trim/go/internal/buildinfo"
-	"github.com/ShawnMa123/token-trim/go/internal/config"
-	xexec "github.com/ShawnMa123/token-trim/go/internal/exec"
-	"github.com/ShawnMa123/token-trim/go/internal/filter"
-	"github.com/ShawnMa123/token-trim/go/internal/recovery"
-	"github.com/ShawnMa123/token-trim/go/internal/stats"
+	"github.com/ShawnMa123/token-trim/internal/buildinfo"
+	"github.com/ShawnMa123/token-trim/internal/config"
+	xexec "github.com/ShawnMa123/token-trim/internal/exec"
+	"github.com/ShawnMa123/token-trim/internal/filter"
+	"github.com/ShawnMa123/token-trim/internal/recovery"
+	"github.com/ShawnMa123/token-trim/internal/stats"
 )
 
 // App carries the process streams so tests can drive the CLI in-process.
@@ -141,8 +141,8 @@ func parseExecArgs(tokens []string) (execOptions, []string, error) {
 				i++
 				v = tokens[i]
 			}
-			if v != "safe" && v != "balanced" {
-				return opts, nil, fmt.Errorf("exec: --profile must be safe or balanced")
+			if v != "safe" && v != "balanced" && v != "aggressive" {
+				return opts, nil, fmt.Errorf("exec: --profile must be safe, balanced, or aggressive")
 			}
 			opts.profile = v
 			i++

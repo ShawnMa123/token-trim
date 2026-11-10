@@ -1,3 +1,5 @@
+//go:build linux
+
 // Command bench measures wrapper overhead, peak RSS, and output bytes for the
 // same commands under three arms: direct, rtk-go, and original rtk.
 package main

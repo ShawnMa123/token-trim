@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(cd "$HERE/../../.." && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 TAG=${TAG:-rtk-go-codex-e2e-pytest}
 RUNS=${RUNS:-4}
 RESULTS="${RESULTS_DIR:-$HERE/results-pytest}"

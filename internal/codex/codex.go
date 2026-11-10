@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ShawnMa123/token-trim/go/internal/filter"
+	"github.com/ShawnMa123/token-trim/internal/filter"
 )
 
 // RewriteResult is the pure analysis outcome. It never executes a command.

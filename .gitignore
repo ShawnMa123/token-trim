@@ -31,3 +31,13 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# rtk-go local build artifacts
+/rtk-go
+/rtk-go.exe
+/bin/
+/dist/
+coverage.html
+
+# e2e outputs
+/results*/

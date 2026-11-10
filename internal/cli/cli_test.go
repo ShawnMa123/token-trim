@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ShawnMa123/token-trim/go/internal/recovery"
+	"github.com/ShawnMa123/token-trim/internal/recovery"
 )
 
 func writeTestConfig(t *testing.T, dataDir string) string {

@@ -1,10 +1,12 @@
 # Build rtk-go with the pinned Go 1.25 toolchain.
 FROM golang:1.25-alpine AS build
 WORKDIR /src
-COPY go/ /src/
+COPY go.mod ./
+COPY cmd ./cmd
+COPY internal ./internal
 RUN CGO_ENABLED=0 GOTOOLCHAIN=local GOPROXY=off \
     go build -mod=readonly -trimpath -o /out/rtk-go ./cmd/rtk-go
-COPY test/e2e/codex-token-savings/bench.go /build/bench.go
+COPY test/e2e/bench.go /build/bench.go
 RUN CGO_ENABLED=0 go build -trimpath -o /out/bench /build/bench.go
 
 FROM rtk-original:0.49.0 AS rtkbin
@@ -21,8 +23,8 @@ RUN npm install -g @openai/codex@0.163.0
 COPY --from=build /out/rtk-go /usr/local/bin/rtk-go
 COPY --from=build /out/bench /usr/local/bin/bench
 COPY --from=rtkbin /src/target/release/rtk /usr/local/bin/rtk
-COPY test/e2e/codex-token-savings/codex-config.toml /root/.codex/config.toml
+COPY test/e2e/codex-config.toml /root/.codex/config.toml
 ARG FIXTURE=fixture.sh
-COPY test/e2e/codex-token-savings/${FIXTURE} /usr/local/bin/make-fixture
+COPY test/e2e/${FIXTURE} /usr/local/bin/make-fixture
 RUN chmod +x /usr/local/bin/make-fixture && /usr/local/bin/make-fixture
 WORKDIR /work

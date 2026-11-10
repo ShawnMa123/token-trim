@@ -2,7 +2,7 @@
 # A/B/C token test for failure/diff outputs: baseline vs rtk-go vs rtk.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(cd "$HERE/../../.." && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 TAG=${TAG:-rtk-go-codex-e2e-fail}
 RUNS=${RUNS:-6}
 RESULTS="${RESULTS_DIR:-$HERE/results-fail}"

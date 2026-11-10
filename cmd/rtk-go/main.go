@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/ShawnMa123/token-trim/go/internal/cli"
+	"github.com/ShawnMa123/token-trim/internal/cli"
 )
 
 func main() {
