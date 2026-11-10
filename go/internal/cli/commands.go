@@ -227,6 +227,9 @@ func (a *App) gain(args []string) int {
 	fmt.Fprintf(a.Stdout, "emitted bytes: %d (stdout %d, stderr %d)\n", sum.EmittedStdoutBytes+sum.EmittedStderrBytes, sum.EmittedStdoutBytes, sum.EmittedStderrBytes)
 	fmt.Fprintf(a.Stdout, "estimated tokens: %d -> %d (%s)\n", sum.EstimatedInputTokens, sum.EstimatedOutputTokens, sum.EstimateMethod)
 	fmt.Fprintf(a.Stdout, "gross saved: %d bytes\n", sum.GrossSavedBytes)
+	if sum.RecoveryAvailable > 0 {
+		fmt.Fprintf(a.Stdout, "recovery records: %d of %d still readable\n", sum.RecoveryAvailableNow, sum.RecoveryAvailable)
+	}
 	fmt.Fprintf(a.Stdout, "recall: %d reads, %d bytes\n", sum.RecallCount, sum.RecallBytes)
 	fmt.Fprintf(a.Stdout, "net saved: %d bytes\n", sum.NetSavedBytes)
 	if sum.CorruptEvents > 0 {

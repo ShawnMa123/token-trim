@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -106,6 +105,8 @@ type Summary struct {
 	EstimatedInputTokens  int64     `json:"estimated_input_tokens"`
 	EstimatedOutputTokens int64     `json:"estimated_output_tokens"`
 	GrossSavedBytes       int64     `json:"gross_saved_bytes"`
+	RecoveryAvailable     int       `json:"recovery_available"`
+	RecoveryAvailableNow  int       `json:"recovery_available_now"`
 	RecallCount           int       `json:"recall_count"`
 	RecallBytes           int64     `json:"recall_bytes"`
 	NetSavedBytes         int64     `json:"net_saved_bytes"`
@@ -169,6 +170,12 @@ func Gain(root string, since, until time.Time) (Summary, error) {
 			if e.ExitCode != 0 {
 				sum.Failed++
 			}
+			if e.RecoveryAvailable {
+				sum.RecoveryAvailable++
+				if recordFresh(root, e.ID, until) {
+					sum.RecoveryAvailableNow++
+				}
+			}
 			sum.RawStdoutBytes += e.RawStdoutBytes
 			sum.RawStderrBytes += e.RawStderrBytes
 			sum.EmittedStdoutBytes += e.EmittedStdoutBytes
@@ -182,6 +189,38 @@ func Gain(root string, since, until time.Time) (Summary, error) {
 	sum.GrossSavedBytes = rawTotal - emittedTotal
 	sum.NetSavedBytes = sum.GrossSavedBytes - sum.RecallBytes
 	return sum, nil
+}
+
+// recordFresh checks the current on-disk manifest instead of trusting the
+// historical recovery_available flag.
+func recordFresh(root, id string, now time.Time) bool {
+	if !validID(id) {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(root, "runs", id, "manifest.json"))
+	if err != nil {
+		return false
+	}
+	var m struct {
+		Complete  bool      `json:"complete"`
+		ExpiresAt time.Time `json:"expires_at"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return false
+	}
+	return m.Complete && now.Before(m.ExpiresAt)
+}
+
+func validID(id string) bool {
+	if len(id) != 32 {
+		return false
+	}
+	for _, r := range id {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 // ParseSince parses Nd, Nh, Nm, or Ns.
@@ -270,6 +309,3 @@ func Clean(root string, retentionDays int, now time.Time, dryRun bool) (int, int
 	}
 	return count, bytes, nil
 }
-
-// SortIDs is a helper for deterministic tests.
-func SortIDs(ids []string) { sort.Strings(ids) }

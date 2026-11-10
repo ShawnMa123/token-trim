@@ -73,18 +73,18 @@ func Select(argv []string, profile string) *Selection {
 		}
 	case "go":
 		if len(argv) >= 2 && argv[1] == "test" {
-			if profile == "safe" {
+			if profile == "safe" || hasArg(argv[2:], "-c") || hasArg(argv[2:], "--compile-only") {
 				return nil
 			}
 			return &Selection{Filter: goTestFilter{json: hasArg(argv[2:], "-json")}, Family: "go test", Test: true}
 		}
 	case "pytest", "py.test":
-		if profile == "safe" {
+		if profile == "safe" || !safePytestArgs(argv[1:]) {
 			return nil
 		}
 		return &Selection{Filter: pytestFilter{}, Family: "pytest", Test: true}
 	case "python", "python3":
-		if profile == "safe" || len(argv) < 3 || argv[1] != "-m" || argv[2] != "pytest" {
+		if profile == "safe" || len(argv) < 3 || argv[1] != "-m" || argv[2] != "pytest" || !safePytestArgs(argv[3:]) {
 			return nil
 		}
 		return &Selection{Filter: pytestFilter{}, Family: "pytest", Test: true}
@@ -224,6 +224,16 @@ func nodeTapArgs(args []string) bool {
 		}
 	}
 	return isTest && reporters == 1 && tap
+}
+
+func safePytestArgs(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "--collect-only", "--co", "--fixtures", "--setup-show", "--version", "--help", "-h":
+			return false
+		}
+	}
+	return true
 }
 
 func hasArg(args []string, want string) bool {

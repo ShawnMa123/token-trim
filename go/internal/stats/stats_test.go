@@ -3,6 +3,7 @@ package stats
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -27,6 +28,20 @@ func TestWriteAndGain(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 	}
+	// A fresh recovery manifest makes the historical flag currently readable.
+	id := strings.Repeat("a", 32)
+	runDir := filepath.Join(root, "runs", id)
+	if err := os.MkdirAll(runDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"complete":true,"expires_at":"2030-01-01T00:00:00Z"}`
+	if err := os.WriteFile(filepath.Join(runDir, "manifest.json"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(root, Event{ID: id, StartedAtUTC: base, Mode: "filtered", RawStdoutBytes: 10, EmittedStdoutBytes: 5, RecoveryAvailable: true}); err != nil {
+		t.Fatal(err)
+	}
+
 	// Corrupt event must be reported, not fatal.
 	corruptDir := filepath.Join(root, "stats", base.Format("2006-01-02"))
 	if err := os.WriteFile(filepath.Join(corruptDir, "bad.json"), []byte("{"), 0o600); err != nil {
@@ -37,25 +52,28 @@ func TestWriteAndGain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sum.Runs != 3 || sum.Filtered != 1 || sum.Fallback != 1 || sum.RawRuns != 1 {
+	if sum.Runs != 4 || sum.Filtered != 2 || sum.Fallback != 1 || sum.RawRuns != 1 {
 		t.Fatalf("counts = %+v", sum)
+	}
+	if sum.RecoveryAvailable != 2 || sum.RecoveryAvailableNow != 1 {
+		t.Fatalf("recovery = %d/%d", sum.RecoveryAvailableNow, sum.RecoveryAvailable)
 	}
 	if sum.Failed != 1 || sum.CorruptEvents != 1 {
 		t.Fatalf("failed/corrupt = %d/%d", sum.Failed, sum.CorruptEvents)
 	}
-	if sum.RawStdoutBytes != 417 || sum.RawStderrBytes != 10 {
+	if sum.RawStdoutBytes != 427 || sum.RawStderrBytes != 10 {
 		t.Fatalf("raw bytes = %d/%d", sum.RawStdoutBytes, sum.RawStderrBytes)
 	}
-	if sum.EmittedStdoutBytes != 117 || sum.EmittedStderrBytes != 10 {
+	if sum.EmittedStdoutBytes != 122 || sum.EmittedStderrBytes != 10 {
 		t.Fatalf("emitted bytes = %d/%d", sum.EmittedStdoutBytes, sum.EmittedStderrBytes)
 	}
-	if sum.EstimatedInputTokens != Tokens(427) || sum.EstimatedOutputTokens != Tokens(127) {
+	if sum.EstimatedInputTokens != Tokens(437) || sum.EstimatedOutputTokens != Tokens(132) {
 		t.Fatalf("tokens = %d/%d", sum.EstimatedInputTokens, sum.EstimatedOutputTokens)
 	}
 	if sum.RecallCount != 1 || sum.RecallBytes != 50 {
 		t.Fatalf("recall = %d/%d", sum.RecallCount, sum.RecallBytes)
 	}
-	if sum.GrossSavedBytes != 300 || sum.NetSavedBytes != 250 {
+	if sum.GrossSavedBytes != 305 || sum.NetSavedBytes != 255 {
 		t.Fatalf("savings = %d/%d", sum.GrossSavedBytes, sum.NetSavedBytes)
 	}
 }

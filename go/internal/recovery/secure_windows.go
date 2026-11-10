@@ -56,8 +56,18 @@ func checkPrivateDir(path string) error { return verifyPrivateDACL(path) }
 // secureDir creates the data root and installs a protected DACL granting only
 // the current user, SYSTEM, and Administrators. Failure disables storage.
 func secureDir(path string) error {
+	if info, err := os.Lstat(path); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("data root is a symlink")
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return err
+	}
+	if info, err := os.Lstat(path); err != nil || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("data root is not a real directory")
 	}
 	if err := setPrivateDACL(path); err != nil {
 		return err
