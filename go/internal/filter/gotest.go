@@ -302,6 +302,9 @@ func applyGoTestFailures(in Input) (Output, error) {
 		}
 		trimmed := strings.TrimSpace(line)
 		switch {
+		case line == "FAIL" || line == "PASS":
+			// implied by the package summaries
+			removed++
 		case isGoPackageSummary(line):
 			out = append(out, line)
 		case strings.HasPrefix(trimmed, "--- FAIL:"):

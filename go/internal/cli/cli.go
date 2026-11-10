@@ -282,7 +282,7 @@ func (a *App) execCommand(tokens []string, forceRaw bool) int {
 				} else if _, err := resv.Commit(id, res.Stdout, res.Stderr, res.ExitCode, "utf-8"); err != nil {
 					fallbackReason = "recovery commit failed"
 				} else {
-					hint := fmt.Sprintf("[rtk-go: -%d lines; recall %s]\n", out.RemovedLines, id)
+					hint := fmt.Sprintf("[rtk-go: -%d; recall %s]\n", out.RemovedLines, id)
 					if cand := filter.BuildCandidate(res.Stdout, out, hint); cand != nil {
 						finalOut = cand
 						mode = "filtered"

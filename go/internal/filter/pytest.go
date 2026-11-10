@@ -170,7 +170,6 @@ func renderPytestAggressive(lines []string, summaryIdx int) (Output, error) {
 	var out []string
 	out = append(out, summary)
 	if len(blocks) > 0 {
-		out = append(out, "Failures:")
 		for i, block := range blocks {
 			if i >= 20 {
 				out = append(out, fmt.Sprintf("... +%d more failures", len(blocks)-20))

@@ -12,7 +12,7 @@ type gitDiffFilter struct{}
 
 func (gitDiffFilter) ID() string { return "git-diff/v1" }
 
-const gitDiffMaxChangedLines = 100
+const gitDiffMaxChangedLines = 80
 
 func (gitDiffFilter) Apply(in Input) (Output, error) {
 	lines := splitLines(string(in.Stdout))
@@ -32,8 +32,9 @@ func (gitDiffFilter) Apply(in Input) (Output, error) {
 			strings.HasPrefix(line, "diff --combined "):
 			inHunk = false
 			out = append(out, line)
-		case strings.HasPrefix(line, "index "),
-			strings.HasPrefix(line, "old mode "),
+		case strings.HasPrefix(line, "index "):
+			// object ids are not needed to read the change; recall keeps them
+		case strings.HasPrefix(line, "old mode "),
 			strings.HasPrefix(line, "new mode "),
 			strings.HasPrefix(line, "deleted file mode "),
 			strings.HasPrefix(line, "new file mode "),

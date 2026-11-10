@@ -138,11 +138,11 @@ func collectStatusFact(branch, notes []string, line string, compact bool) ([]str
 	}
 	switch {
 	case strings.HasPrefix(line, "On branch "):
-		branch = append(branch, "## "+strings.TrimPrefix(line, "On branch "))
+		branch = append(branch, "* "+strings.TrimPrefix(line, "On branch "))
 	case strings.HasPrefix(line, "HEAD detached at "), strings.HasPrefix(line, "HEAD detached from "):
-		branch = append(branch, "## "+line)
+		branch = append(branch, "* "+line)
 	case line == "Not currently on any branch.":
-		branch = append(branch, "## no branch")
+		branch = append(branch, "* no branch")
 	case strings.HasPrefix(line, "Your branch is up to date"):
 		// no extra divergence token
 	case strings.HasPrefix(line, "Your branch is ahead of "):
@@ -167,7 +167,7 @@ func collectStatusFact(branch, notes []string, line string, compact bool) ([]str
 		line == "All conflicts fixed but you are still merging.":
 		notes = append(notes, line)
 	case line == "No commits yet":
-		branch = append(branch, "## no commits")
+		branch = append(branch, "* no commits")
 	case strings.HasPrefix(line, "nothing to commit"):
 		notes = append(notes, "clean")
 	}
@@ -176,7 +176,7 @@ func collectStatusFact(branch, notes []string, line string, compact bool) ([]str
 
 func addDivergence(branch []string, fact string) []string {
 	if len(branch) == 0 {
-		return append(branch, "## "+fact)
+		return append(branch, "* "+fact)
 	}
 	branch[len(branch)-1] += " " + fact
 	return branch
@@ -184,6 +184,9 @@ func addDivergence(branch []string, fact string) []string {
 
 func divergenceCount(s, before, after string) (string, bool) {
 	i := strings.Index(s, before)
+	if before == "have " {
+		i = strings.LastIndex(s, before)
+	}
 	if i < 0 {
 		return "", false
 	}

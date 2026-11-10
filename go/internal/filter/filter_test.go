@@ -525,7 +525,7 @@ func TestGitStatusCompact(t *testing.T) {
 	}
 	text := string(out.Text)
 	for _, want := range []string{
-		"## main ahead=2",
+		"* main ahead=2",
 		"M  src/a b.go",
 		"A  \"中文 文件.txt\"",
 		"R  old name.go -> new name.go",
@@ -666,7 +666,7 @@ func TestGitDiffTruncatesChangedLines(t *testing.T) {
 		t.Fatalf("fallback: %s", why)
 	}
 	text := string(out.Text)
-	if !strings.Contains(text, "... (+150 -50 truncated)") {
+	if !strings.Contains(text, "... (+150 -70 truncated)") {
 		t.Fatalf("missing truncation summary:\n%s", text[max(0, len(text)-120):])
 	}
 	if strings.Contains(text, "+new 100") || !out.Lossy {
