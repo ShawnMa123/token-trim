@@ -34,6 +34,9 @@ func (nodeTAPFilter) Apply(in Input) (Output, error) {
 			continue
 		}
 		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			if tapTestLine.MatchString(strings.TrimSpace(line)) {
+				return Output{}, fmt.Errorf("nested TAP")
+			}
 			if keepBlock {
 				out = append(out, line)
 			}

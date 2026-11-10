@@ -175,7 +175,8 @@ func (a *App) execCommand(tokens []string, forceRaw bool) int {
 
 	cfgLoaded := config.Load()
 	cfg := cfgLoaded.Config
-	effectiveRaw := forceRaw || opts.raw || config.Disabled() || cfgLoaded.Err != nil || os.Getenv("RTK_GO_ACTIVE") == "1"
+	effectiveRaw := forceRaw || opts.raw || config.Disabled() || cfgLoaded.Err != nil ||
+		os.Getenv("RTK_GO_ACTIVE") == "1" || isTerminalWriter(a.Stdout)
 	noStore := opts.noStore || config.NoStore() || !cfg.Storage.Enabled
 	profile := opts.profile
 	if profile == "" {
@@ -328,6 +329,18 @@ func (a *App) execCommand(tokens []string, forceRaw bool) int {
 
 	a.recordStats(cfg, cfgLoaded, id, started, sel, mode, parserID, fallbackReason, recoveryAvailable, res, emittedStdout)
 	return res.ExitCode
+}
+
+func isTerminalWriter(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
 
 func mirrorLimit(resv *recovery.Reservation) int {

@@ -394,14 +394,18 @@ func (a *App) doctor(args []string) int {
 	}
 
 	store := recovery.New(cfg.Storage.DataDir, cfg.Storage.TotalMiB, cfg.Storage.RetentionHours)
-	exists, err := store.Check()
-	switch {
-	case err != nil:
-		add("storage privacy", "fail", fmt.Sprintf("%s: %v", cfg.Storage.DataDir, err))
-	case !exists:
-		add("storage privacy", "info", cfg.Storage.DataDir+" (not created yet)")
-	default:
-		add("storage privacy", "ok", cfg.Storage.DataDir+" (owner-only)")
+	if cfg.Storage.Enabled {
+		exists, err := store.Check()
+		switch {
+		case err != nil:
+			add("storage privacy", "fail", fmt.Sprintf("%s: %v", cfg.Storage.DataDir, err))
+		case !exists:
+			add("storage privacy", "info", cfg.Storage.DataDir+" (not created yet)")
+		default:
+			add("storage privacy", "ok", cfg.Storage.DataDir+" (owner-only)")
+		}
+	} else {
+		add("storage privacy", "info", "storage disabled; no original output is written")
 	}
 	add("storage", "info", fmt.Sprintf("enabled=%v retention=%dh quota=%dMiB", cfg.Storage.Enabled, cfg.Storage.RetentionHours, cfg.Storage.TotalMiB))
 	add("profile", "info", cfg.Profile)
