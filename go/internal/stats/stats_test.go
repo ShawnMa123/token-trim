@@ -121,7 +121,7 @@ func TestCleanRetention(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Write sets mtime to now; age the old file explicitly.
-	oldPath := filepath.Join(root, "stats", old.StartedAtUTC.Format("2006-01-02"), "old.json")
+	oldPath := filepath.Join(root, "stats", old.StartedAtUTC.UTC().Format("2006-01-02"), "old.json")
 	aged := now.Add(-40 * 24 * time.Hour)
 	if err := os.Chtimes(oldPath, aged, aged); err != nil {
 		t.Fatal(err)
@@ -140,7 +140,7 @@ func TestCleanRetention(t *testing.T) {
 	if _, err := os.Stat(oldPath); err == nil {
 		t.Fatal("old event survived cleanup")
 	}
-	freshPath := filepath.Join(root, "stats", fresh.StartedAtUTC.Format("2006-01-02"), "fresh.json")
+	freshPath := filepath.Join(root, "stats", fresh.StartedAtUTC.UTC().Format("2006-01-02"), "fresh.json")
 	if _, err := os.Stat(freshPath); err != nil {
 		t.Fatal("fresh event removed")
 	}

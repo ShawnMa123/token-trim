@@ -22,9 +22,14 @@ const (
 const instructionsBlock = managedBegin + `
 ## rtk-go command output
 
-Use ` + "`rtk-go exec -- <command>`" + ` for supported read-only queries (git status, git log, rg).
-When output is summarized, recover the full original with ` + "`rtk-go recall <id>`" + `; never rerun a command just to read output.
-Do not wrap machine-readable output, pipelines, redirections, tests, builds, or write commands.
+When you run shell commands, prefix supported commands with ` + "`rtk-go exec --`" + `:
+
+- ` + "`rtk-go exec -- git status`" + `, ` + "`rtk-go exec -- git log`" + `, ` + "`rtk-go exec -- git diff`" + `
+- ` + "`rtk-go exec -- rg <pattern> <path>`" + `
+- ` + "`rtk-go exec -- go test ./...`" + `, ` + "`rtk-go exec -- pytest`" + `, ` + "`rtk-go exec -- node --test ...`" + `
+
+Do not prefix machine-readable output, pipelines, redirections, interactive commands, or write commands.
+If output is summarized, read the full original with ` + "`rtk-go recall <id>`" + `; never rerun a command only to recover output.
 ` + managedEnd + `
 `
 
