@@ -159,6 +159,13 @@ func collectStatusFact(branch, notes []string, line string, compact bool) ([]str
 				branch = addDivergence(branch, "diverged="+n+"/"+m)
 			}
 		}
+	case strings.HasPrefix(line, "You are currently "),
+		strings.HasPrefix(line, "You are in the middle of "),
+		strings.HasPrefix(line, "interactive rebase in progress;"),
+		strings.HasPrefix(line, "rebase in progress;"),
+		line == "You have unmerged paths.",
+		line == "All conflicts fixed but you are still merging.":
+		notes = append(notes, line)
 	case line == "No commits yet":
 		branch = append(branch, "## no commits")
 	case strings.HasPrefix(line, "nothing to commit"):

@@ -34,11 +34,16 @@ rtk-go doctor [--probe]           # 只读诊断；probe 仅本地 marker
 rtk-go version --format json
 ```
 
-过滤后的 stdout 末尾会出现：
+过滤后的 stdout 末尾会出现短提示：
 
 ```text
-[rtk-go: hidden=120 lines; recall=rtk-go recall <id>]
+[rtk-go: -120 lines; recall <id>]
 ```
+
+`aggressive`（默认）会像原版 RTK 一样做有界省略：rg 最多展示 10 个文件/200
+条匹配并截断超长行；git status 使用 porcelain 风格 XY 短码；diff 省略
+context 并限制 100 行改动；测试失败只输出失败/跳过块与包汇总。每处省略都
+先完整提交原文，可用 `rtk-go recall <id>` 回读。`safe`/`balanced` 保留旧行为。
 
 `recall` 默认分页（1-based offset、默认 200 行、上限 5000）。机器可读二进制/非 UTF-8 原文用单流 `--raw`：
 
@@ -52,20 +57,20 @@ rtk-go recall <id> --stream stdout --raw
 
 | 命令形态 | 处理 |
 |---|---|
-| `git status` 默认长格式 | 折叠提示/空行，保留分支、ahead/behind、全部路径、rename 两端、冲突 |
+| `git status` 默认长格式 | aggressive 输出 XY 短码；所有路径/rename/冲突/分支保留 |
 | `git status --porcelain*` / `-z` / `-s` | 原文 |
-| `git diff`、`git diff --stat`、patch、任何机器格式 | 原文 |
-| `git log` 默认格式（安全 flags） | 折叠 Author 与空行，保留完整 hash、日期、消息、顺序、merge 行 |
+| `git diff` patch | aggressive 省略 context、限制 100 行改动并输出 hidden 计数；机器格式原文 |
+| `git log` 默认格式（安全 flags） | aggressive 输出最多 10 条短 hash+subject（`-n` 可调）；safe/balanced 保留完整 hash/日期/消息 |
 | `git log --oneline` / `--format` / `--pretty` / patch / graph | 原文 |
-| `rg` 人类可读 `path:line[:col]:text` | 按路径无损分组，保留全部匹配与行号 |
+| `rg` 人类可读 `path:line[:col]:text` | aggressive 按路径分组并限制 10 文件/200 匹配、40B 行；safe/balanced 保留全部 |
 | `rg --json`、`-0`、`--files`、`-A/-B/-C`、`--pre` 等 | 原文 |
-| `go test` / `-v` | 成功时折叠 RUN/PASS；失败、panic、race、非零退出整次原文 |
+| `go test` / `-v` | 成功折叠 RUN/PASS；aggressive 失败时只保留失败/跳过块与包汇总；panic/race 原文 |
 | `go test -json` | 仅成功且事件流完整时输出包摘要；未知事件/失败/非法 JSON 原文 |
 | `pytest` / `python -m pytest` | 保留失败/错误/warning/skip/最终 summary；未知 preamble 原文 |
 | `node --test --test-reporter=tap` | 折叠成功 TAP 块，保留失败/skip/todo 与计数；嵌套/未知 TAP 原文 |
 | `go build` / `go vet` / 其他程序 | 原文；成功静默不伪造输出 |
 
-`safe` profile 只启用 Git status/log 与 rg；`balanced`（默认）增加测试过滤器。所有有损候选都必须在原文完整提交后，且候选（含 hint）字节数严格小于原文才会采用；平局与空输出一律原文。
+`safe` profile 只启用 Git status/log 与 rg（保留全部正文）；`balanced` 增加测试过滤器；`aggressive`（默认）增加 status/rg/diff 有界省略与失败折叠。所有有损候选都必须在原文完整提交后，且候选（含 hint）字节数严格小于原文才会采用；平局与空输出一律原文。
 
 ## 安全模型
 
@@ -86,7 +91,7 @@ rtk-go recall <id> --stream stdout --raw
 ```json
 {
   "schema_version": 1,
-  "profile": "balanced",
+  "profile": "aggressive",
   "storage": {
     "enabled": true,
     "data_dir": "",

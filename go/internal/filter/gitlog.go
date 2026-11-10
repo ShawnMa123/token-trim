@@ -7,11 +7,17 @@ import (
 
 // gitLogFilter compresses default-format log redundancy while keeping the
 // complete hash, date, decorations, merge parents, message, and order.
-type gitLogFilter struct{}
+type gitLogFilter struct {
+	aggressive bool
+	max        int
+}
 
 func (gitLogFilter) ID() string { return "git-log/v1" }
 
-func (gitLogFilter) Apply(in Input) (Output, error) {
+func (f gitLogFilter) Apply(in Input) (Output, error) {
+	if f.aggressive {
+		return f.applyAggressive(in)
+	}
 	lines := splitLines(string(in.Stdout))
 	if len(lines) == 0 {
 		return Output{}, fmt.Errorf("empty log")
@@ -95,4 +101,84 @@ func isCommitLine(line string) bool {
 		}
 	}
 	return true
+}
+
+// applyAggressive keeps one line per commit: short hash and subject. The full
+// hash, date, author, decorations, and message body stay in the recovery
+// record.
+func (f gitLogFilter) applyAggressive(in Input) (Output, error) {
+	lines := splitLines(string(in.Stdout))
+	if len(lines) == 0 {
+		return Output{}, fmt.Errorf("empty log")
+	}
+	max := f.max
+	if max <= 0 {
+		max = 10
+	}
+	var out []string
+	commits := 0
+	hidden := 0
+	i := 0
+	for i < len(lines) && commits < max {
+		for i < len(lines) && lines[i] == "" {
+			i++
+		}
+		if i >= len(lines) {
+			break
+		}
+		if !isCommitLine(lines[i]) {
+			return Output{}, fmt.Errorf("expected commit header")
+		}
+		hash := strings.Fields(strings.TrimPrefix(lines[i], "commit "))[0]
+		i++
+		if i < len(lines) && strings.HasPrefix(lines[i], "Merge: ") {
+			i++
+		}
+		if i >= len(lines) || !strings.HasPrefix(lines[i], "Author: ") {
+			return Output{}, fmt.Errorf("missing author")
+		}
+		i++
+		if i >= len(lines) || !strings.HasPrefix(lines[i], "Date:   ") {
+			return Output{}, fmt.Errorf("missing date")
+		}
+		i++
+		var msg []string
+		for i < len(lines) && !isCommitLine(lines[i]) {
+			msg = append(msg, lines[i])
+			i++
+		}
+		subject := ""
+		for _, l := range msg {
+			if strings.TrimSpace(l) != "" {
+				subject = strings.TrimSpace(l)
+				break
+			}
+		}
+		if len(subject) > 120 {
+			subject = truncateUTF8(subject, 120) + "..."
+		}
+		if subject == "" {
+			subject = "(no message)"
+		}
+		short := hash
+		if len(short) > 8 {
+			short = short[:8]
+		}
+		out = append(out, short+" "+subject)
+		commits++
+	}
+	if commits == 0 {
+		return Output{}, fmt.Errorf("no commits")
+	}
+	for i < len(lines) {
+		if isCommitLine(lines[i]) {
+			hidden++
+		}
+		i++
+	}
+	if hidden == 0 {
+		// Count elided author/date/body lines for the hint.
+		hidden = 1
+	}
+	return Output{Text: joinLines(out), Lossy: true, RemovedLines: hidden}, nil
 }

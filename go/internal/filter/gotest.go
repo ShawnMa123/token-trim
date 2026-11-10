@@ -42,6 +42,9 @@ func applyGoTestText(in Input, aggressive bool) (Output, error) {
 		}
 	}
 	lines := splitLines(text)
+	if aggressive {
+		return renderGoTestSuccessSummary(lines)
+	}
 	var out []string
 	removed := 0
 	for _, line := range lines {
@@ -190,6 +193,50 @@ func applyGoTestJSON(in Input, aggressive bool) (Output, error) {
 		return Output{}, fmt.Errorf("nothing to fold")
 	}
 	return Output{Text: joinLines(out), Lossy: true, RemovedLines: hidden}, nil
+}
+
+func renderGoTestSuccessSummary(lines []string) (Output, error) {
+	passed := 0
+	packages := 0
+	removed := 0
+	var out []string
+	keepIndented := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "--- PASS:"):
+			passed++
+			keepIndented = false
+			removed++
+		case strings.HasPrefix(line, "=== RUN"), strings.HasPrefix(line, "=== PAUSE"),
+			strings.HasPrefix(line, "=== CONT"), strings.HasPrefix(line, "=== NAME"):
+			keepIndented = false
+			removed++
+		case strings.HasPrefix(line, "ok  \t"):
+			packages++
+			removed++
+		case line == "PASS":
+			removed++
+		case strings.HasPrefix(trimmed, "--- SKIP:"):
+			keepIndented = true
+			out = append(out, line)
+		case strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t"):
+			if keepIndented {
+				out = append(out, line)
+			} else {
+				removed++
+			}
+		default:
+			keepIndented = false
+			out = append(out, line)
+		}
+	}
+	if passed == 0 {
+		return Output{}, fmt.Errorf("no passing test detail")
+	}
+	head := fmt.Sprintf("Go test: %d passed in %d packages", passed, packages)
+	out = append([]string{head}, out...)
+	return Output{Text: joinLines(out), Lossy: true, RemovedLines: removed}, nil
 }
 
 func applyGoTestFailures(in Input) (Output, error) {

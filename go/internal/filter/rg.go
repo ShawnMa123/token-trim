@@ -16,7 +16,7 @@ type rgFilter struct{ aggressive bool }
 const (
 	rgMaxFiles     = 10
 	rgMaxMatches   = 200
-	rgMaxLineBytes = 160
+	rgMaxLineBytes = 40
 )
 
 func (rgFilter) ID() string { return "rg/v1" }
@@ -76,6 +76,9 @@ func (f rgFilter) Apply(in Input) (Output, error) {
 	out := renderRGGroups(matches[:shown], shown, len(matches))
 	if shown < len(matches) {
 		hiddenFiles := countDistinctPaths(matches[shown:])
+		if shown > 0 && matches[shown-1].path == matches[shown].path {
+			hiddenFiles--
+		}
 		out.Text = joinLines(append(splitLines(string(out.Text)), fmt.Sprintf("+%d more files, %d matches hidden", hiddenFiles, len(matches)-shown)))
 		out.Lossy = true
 		out.RemovedLines += len(matches) - shown

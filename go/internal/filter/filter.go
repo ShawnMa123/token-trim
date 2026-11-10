@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -65,7 +66,8 @@ func Select(argv []string, profile string) *Selection {
 			}
 		case "log":
 			if safeLogArgs(rest) {
-				return &Selection{Filter: gitLogFilter{}, Family: "git log"}
+				max := logLimit(rest)
+				return &Selection{Filter: gitLogFilter{aggressive: profile == "aggressive", max: max}, Family: "git log"}
 			}
 		case "diff":
 			if profile == "aggressive" && safeDiffArgs(rest) {
@@ -88,12 +90,12 @@ func Select(argv []string, profile string) *Selection {
 		if profile == "safe" || !safePytestArgs(argv[1:]) {
 			return nil
 		}
-		return &Selection{Filter: pytestFilter{}, Family: "pytest", Test: true}
+		return &Selection{Filter: pytestFilter{aggressive: profile == "aggressive"}, Family: "pytest", Test: true}
 	case "python", "python3":
 		if profile == "safe" || len(argv) < 3 || argv[1] != "-m" || argv[2] != "pytest" || !safePytestArgs(argv[3:]) {
 			return nil
 		}
-		return &Selection{Filter: pytestFilter{}, Family: "pytest", Test: true}
+		return &Selection{Filter: pytestFilter{aggressive: profile == "aggressive"}, Family: "pytest", Test: true}
 	case "node":
 		if profile == "safe" || !nodeTapArgs(argv[1:]) {
 			return nil
@@ -230,6 +232,35 @@ func nodeTapArgs(args []string) bool {
 		}
 	}
 	return isTest && reporters == 1 && tap
+}
+
+func logLimit(args []string) int {
+	limit := 10
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "-n" || a == "--max-count":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
+					limit = n
+				}
+				i++
+			}
+		case strings.HasPrefix(a, "-n"):
+			if n, err := strconv.Atoi(a[2:]); err == nil && n > 0 {
+				limit = n
+			}
+		case strings.HasPrefix(a, "--max-count="):
+			if n, err := strconv.Atoi(strings.TrimPrefix(a, "--max-count=")); err == nil && n > 0 {
+				limit = n
+			}
+		case len(a) > 1 && a[0] == '-' && isDigits(a[1:]):
+			if n, err := strconv.Atoi(a[1:]); err == nil && n > 0 {
+				limit = n
+			}
+		}
+	}
+	return limit
 }
 
 func safeDiffArgs(args []string) bool {

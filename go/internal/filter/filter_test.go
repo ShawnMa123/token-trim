@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -648,5 +649,103 @@ func TestGoTestJSONFailure(t *testing.T) {
 	}
 	if strings.Contains(text, "TestPass") {
 		t.Fatalf("passing test survived: %q", text)
+	}
+}
+
+func TestGitDiffTruncatesChangedLines(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,150 +1,150 @@\n")
+	for i := 0; i < 150; i++ {
+		fmt.Fprintf(&b, "-old %03d\n", i)
+	}
+	for i := 0; i < 150; i++ {
+		fmt.Fprintf(&b, "+new %03d\n", i)
+	}
+	out, why := Run(gitDiffFilter{}, Input{Stdout: []byte(b.String()), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	if !strings.Contains(text, "... (+150 -50 truncated)") {
+		t.Fatalf("missing truncation summary:\n%s", text[max(0, len(text)-120):])
+	}
+	if strings.Contains(text, "+new 100") || !out.Lossy {
+		t.Fatalf("expected capped lossy diff: %+v", out)
+	}
+}
+
+func TestGoTestAggressiveSuccessSummary(t *testing.T) {
+	body := "=== RUN   TestA\n--- PASS: TestA (0.00s)\n=== RUN   TestB\n--- PASS: TestB (0.01s)\nPASS\nok  \texample.com/p\t0.02s\n"
+	out, why := Run(goTestFilter{aggressive: true}, Input{ExitCode: 0, Stdout: []byte(body), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	if string(out.Text) != "Go test: 2 passed in 1 packages\n" {
+		t.Fatalf("candidate = %q", out.Text)
+	}
+}
+
+func TestGitLogAggressiveCapsAndShortens(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 12; i++ {
+		fmt.Fprintf(&b, "commit %040x\nAuthor: A <a@b>\nDate:   Mon Nov 10 12:00:0%d 2025 +0800\n\n    subject %d\n\n    body line that should be elided\n\n", i+1, i%10, i)
+	}
+	out, why := Run(gitLogFilter{aggressive: true, max: 10}, Input{Stdout: []byte(b.String()), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	if strings.Count(text, "\n") > 10 {
+		t.Fatalf("expected at most 10 lines:\n%s", text)
+	}
+	for _, gone := range []string{"Author:", "Date:   ", "body line"} {
+		if strings.Contains(text, gone) {
+			t.Errorf("elided text survived: %q", gone)
+		}
+	}
+	if !strings.Contains(text, "subject 0") || !strings.Contains(text, "subject 9") {
+		t.Errorf("subjects missing:\n%s", text)
+	}
+	if strings.Contains(text, "subject 10") {
+		t.Error("commit beyond cap survived")
+	}
+	if !out.Lossy {
+		t.Fatal("aggressive log must be lossy")
+	}
+	if got := logLimit([]string{"-n", "3"}); got != 3 {
+		t.Fatalf("logLimit -n = %d", got)
+	}
+}
+
+func TestPytestAggressiveSummary(t *testing.T) {
+	out, why := Run(pytestFilter{aggressive: true}, Input{ExitCode: 1, Stdout: []byte(pytestQuiet), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	if !strings.Contains(text, "Pytest: 2 passed, 1 failed") {
+		t.Fatalf("summary missing:\n%s", text)
+	}
+	for _, want := range []string{"[FAIL] test_x", "assert 1 == 2"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("lost %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "def test_x") {
+		t.Errorf("traceback body survived:\n%s", text)
+	}
+	if !out.Lossy {
+		t.Fatal("aggressive pytest must be lossy")
+	}
+}
+
+func TestPytestAggressiveSuccess(t *testing.T) {
+	body := "..                                                                       [100%]\n2 passed in 0.01s\n"
+	out, why := Run(pytestFilter{aggressive: true}, Input{ExitCode: 0, Stdout: []byte(body), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	if strings.TrimSpace(string(out.Text)) != "Pytest: 2 passed, 0 failed in 0.01s" {
+		t.Fatalf("candidate = %q", out.Text)
 	}
 }
