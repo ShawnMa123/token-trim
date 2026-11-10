@@ -272,8 +272,18 @@ func (r *Reservation) Commit(id string, stdout, stderr []byte, exitCode int, enc
 	if err := writeFileSync(filepath.Join(partial, "manifest.json"), append(mb, '\n')); err != nil {
 		return Manifest{}, err
 	}
+	if err := syncDir(partial); err != nil {
+		return Manifest{}, err
+	}
 	final := filepath.Join(s.runsDir(), id)
 	if err := os.Rename(partial, final); err != nil {
+		return Manifest{}, err
+	}
+	// Persist the new directory entry before reporting the record committed.
+	if err := syncDir(s.runsDir()); err != nil {
+		return Manifest{}, err
+	}
+	if err := syncDir(s.Root); err != nil {
 		return Manifest{}, err
 	}
 	committed = true
@@ -364,7 +374,10 @@ func writeJSONAtomic(path string, v any) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, path)
+	if err := os.Rename(name, path); err != nil {
+		return err
+	}
+	return syncDir(dir)
 }
 
 // leaseFile is a quota lease owned by one invocation.
