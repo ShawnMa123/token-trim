@@ -745,7 +745,7 @@ func TestPytestAggressiveSuccess(t *testing.T) {
 	if why != "" {
 		t.Fatalf("fallback: %s", why)
 	}
-	if strings.TrimSpace(string(out.Text)) != "Pytest: 2 passed, 0 failed in 0.01s" {
+	if strings.TrimSpace(string(out.Text)) != "Pytest: 2 passed in 0.01s" {
 		t.Fatalf("candidate = %q", out.Text)
 	}
 }

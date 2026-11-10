@@ -123,7 +123,10 @@ func renderPytestAggressive(lines []string, summaryIdx int) (Output, error) {
 	if i := strings.LastIndex(summaryRaw, " in "); i >= 0 {
 		duration = strings.TrimRight(strings.TrimSpace(summaryRaw[i+4:]), "= ")
 	}
-	summary := fmt.Sprintf("Pytest: %d passed, %d failed", counts["passed"], counts["failed"])
+	summary := fmt.Sprintf("Pytest: %d passed", counts["passed"])
+	if counts["failed"] > 0 || counts["error"] > 0 {
+		summary += fmt.Sprintf(", %d failed", counts["failed"])
+	}
 	for _, key := range []string{"skipped", "xfailed", "xpassed", "error", "warning"} {
 		if counts[key] > 0 {
 			summary += fmt.Sprintf(", %d %s", counts[key], key)
