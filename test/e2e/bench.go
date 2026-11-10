@@ -45,43 +45,42 @@ type caseResult struct {
 const warmup = 3
 const samples = 25
 
+func goArms(argv ...string) []arm {
+	out := []arm{{"rtk-go", append([]string{"rtk-go", "exec", "--"}, argv...)}}
+	for _, p := range []string{"safe", "lossless", "balanced", "aggressive"} {
+		out = append(out, arm{
+			"rtk-go/" + p,
+			append([]string{"rtk-go", "exec", "--profile=" + p, "--"}, argv...),
+		})
+	}
+	return out
+}
+
 func main() {
 	cases := []benchCase{
 		{
 			name: "git-status",
 			dir:  "/work",
-			arms: []arm{
-				{"direct", []string{"git", "status"}},
-				{"rtk-go", []string{"rtk-go", "exec", "--", "git", "status"}},
-				{"rtk", []string{"rtk", "git", "status"}},
-			},
+			arms: append([]arm{{"direct", []string{"git", "status"}}},
+				append(goArms("git", "status"), arm{"rtk", []string{"rtk", "git", "status"}})...),
 		},
 		{
 			name: "rg",
 			dir:  "/work",
-			arms: []arm{
-				{"direct", []string{"rg", "-n", "TODO_MARKER", "src"}},
-				{"rtk-go", []string{"rtk-go", "exec", "--", "rg", "-n", "TODO_MARKER", "src"}},
-				{"rtk", []string{"rtk", "rg", "-n", "TODO_MARKER", "src"}},
-			},
+			arms: append([]arm{{"direct", []string{"rg", "-n", "TODO_MARKER", "src"}}},
+				append(goArms("rg", "-n", "TODO_MARKER", "src"), arm{"rtk", []string{"rtk", "rg", "-n", "TODO_MARKER", "src"}})...),
 		},
 		{
 			name: "go-test",
 			dir:  "/work",
-			arms: []arm{
-				{"direct", []string{"go", "test", "-count=1", "-v", "./gen"}},
-				{"rtk-go", []string{"rtk-go", "exec", "--", "go", "test", "-count=1", "-v", "./gen"}},
-				{"rtk", []string{"rtk", "go", "test", "-count=1", "-v", "./gen"}},
-			},
+			arms: append([]arm{{"direct", []string{"go", "test", "-count=1", "-v", "./gen"}}},
+				append(goArms("go", "test", "-count=1", "-v", "./gen"), arm{"rtk", []string{"rtk", "go", "test", "-count=1", "-v", "./gen"}})...),
 		},
 		{
 			name: "tiny-git",
 			dir:  "/tiny",
-			arms: []arm{
-				{"direct", []string{"git", "status"}},
-				{"rtk-go", []string{"rtk-go", "exec", "--", "git", "status"}},
-				{"rtk", []string{"rtk", "git", "status"}},
-			},
+			arms: append([]arm{{"direct", []string{"git", "status"}}},
+				append(goArms("git", "status"), arm{"rtk", []string{"rtk", "git", "status"}})...),
 		},
 	}
 
@@ -123,11 +122,8 @@ func main() {
 		cases = append(cases, benchCase{
 			name: "pytest",
 			dir:  "/work",
-			arms: []arm{
-				{"direct", []string{"pytest", "tests"}},
-				{"rtk-go", []string{"rtk-go", "exec", "--", "pytest", "tests"}},
-				{"rtk", []string{"rtk", "pytest", "tests"}},
-			},
+			arms: append([]arm{{"direct", []string{"pytest", "tests"}}},
+				append(goArms("pytest", "tests"), arm{"rtk", []string{"rtk", "pytest", "tests"}})...),
 		})
 	}
 	if _, err := os.Stat("/work/genfail"); err == nil {
@@ -135,20 +131,14 @@ func main() {
 			benchCase{
 				name: "git-diff",
 				dir:  "/work",
-				arms: []arm{
-					{"direct", []string{"git", "diff", "--", "bigdiff.txt"}},
-					{"rtk-go", []string{"rtk-go", "exec", "--", "git", "diff", "--", "bigdiff.txt"}},
-					{"rtk", []string{"rtk", "git", "diff", "--", "bigdiff.txt"}},
-				},
+				arms: append([]arm{{"direct", []string{"git", "diff", "--", "bigdiff.txt"}}},
+					append(goArms("git", "diff", "--", "bigdiff.txt"), arm{"rtk", []string{"rtk", "git", "diff", "--", "bigdiff.txt"}})...),
 			},
 			benchCase{
 				name: "go-test-fail",
 				dir:  "/work",
-				arms: []arm{
-					{"direct", []string{"go", "test", "-count=1", "-v", "./genfail"}},
-					{"rtk-go", []string{"rtk-go", "exec", "--", "go", "test", "-count=1", "-v", "./genfail"}},
-					{"rtk", []string{"rtk", "go", "test", "-count=1", "-v", "./genfail"}},
-				},
+				arms: append([]arm{{"direct", []string{"go", "test", "-count=1", "-v", "./genfail"}}},
+					append(goArms("go", "test", "-count=1", "-v", "./genfail"), arm{"rtk", []string{"rtk", "go", "test", "-count=1", "-v", "./genfail"}})...),
 			},
 		)
 	}

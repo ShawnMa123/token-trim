@@ -141,6 +141,45 @@ cd test/e2e
 RUNS=3 ./run-longlog.sh
 ```
 
+## G. Profile 对比
+
+同一容器、同一 fixture，`rtk-go` 分别指定 `--profile`；输出字节为该命令的 stdout 字节数
+（含 recall hint），不包含 Codex 系统提示。`lossless` 只在 `cat`/`tail`/`head` 形态生效。
+
+### 输出字节
+
+| 命令 / fixture | direct | safe | lossless | balanced | aggressive |
+|---|---:|---:|---:|---:|---:|
+| git status（常规） | 6,353 | 6,105 | 6,105 | 6,105 | **5,028** |
+| rg（常规） | 61,830 | 47,600 | 47,600 | 47,600 | **9,610** |
+| go test 通过（常规） | 7,324 | 7,324 | 7,324 | 93 | **83** |
+| git diff（失败 fixture） | 14,007 | 14,007 | 14,007 | 14,007 | **5,289** |
+| pytest（pytest fixture） | 1,060 | 1,060 | 1,060 | 748 | **237** |
+| 长日志 + 文章（longlog） | 299,094 | 299,094 | **23,467** | 299,094 | 299,094 |
+
+要点：
+
+- `safe` 不做有损省略；`rg` 的路径分组是唯一明显收益（路径只出现一次）。
+- `lossless` 在长日志上从 299KB 降到 23.5KB；文章没有重复行，原样保留。
+- `balanced` 保留查询正文，只折叠测试进度；因此 go test/pytest 有小幅收益。
+- `aggressive` 的收益来自有界省略；发布前完整保存原文，但**发送给模型的文本不是全量**。
+- 不适合把“输出字节最少”直接等同于“任务效果最好”；长日志 baseline 被截断后 token 反而
+  更少，但丢事实（见 F 节）。
+
+### p95 延迟（25 samples，容器内）
+
+| 场景 | direct | safe | lossless | balanced | aggressive |
+|---|---:|---:|---:|---:|---:|
+| git status | 3.4 ms | 7.1 ms | 7.5 ms | 7.9 ms | 8.2 ms |
+| rg | 4.7 ms | 9.4 ms | 9.7 ms | 11.6 ms | 14.7 ms |
+| go test | 124.0 ms | 152.9 ms | 110.2 ms | 126.4 ms | 130.2 ms |
+| git diff | 0.9 ms | 2.5 ms | 2.3 ms | 2.5 ms | 11.8 ms |
+| pytest | 226.7 ms | 233.1 ms | 210.6 ms | 207.2 ms | 194.9 ms |
+
+包装器固定启动开销约占 5~10ms；go test/pytest 的总耗时由子进程和容器负载主导，单次
+差异不能当作算法结论。`aggressive` 在 diff/rg 上更慢，是因为实际做了截断和分组；
+`safe`/`lossless` 不做这些工作。
+
 ## 性能（3 warm-up + 25 samples）
 
 ### 常规 fixture
