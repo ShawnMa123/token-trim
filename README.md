@@ -37,6 +37,10 @@ Codex 执行 `git status`、`rg`、`go test` 时，重复的路径、通过测�
 - 另做 9 次 bug-fix 质量回归（3 arm × 3 轮），全部修复成功并通过 `go test ./...`。
 - 完整方法、分命令数据和限制见 [`docs/benchmarks.md`](docs/benchmarks.md)。
 
+长日志专项（300KB、3000 行重复 heartbeat + 稀疏事实）：`--profile lossless` 输出
+23.5KB，3/3 次答对；baseline 仅 1/3 次答对（原始输出被 Codex 截断）。长文本无重复行时
+lossless 自动回退原文，收益为 0。
+
 **不要把这张表当成生产承诺**：结果来自单一模型、单一 Codex 版本和合成 fixture；不同仓库、
 不同 prompt、不同模型会有差异。
 
@@ -132,7 +136,8 @@ Codex 版本/Shell/权限回归时会拒绝安装，不会静默修改配置。*
 |---|---|
 | `aggressive` | 默认。有界省略：rg 10 文件/200 匹配/40B 行；diff 80 行改动；log 10 条；失败测试只留失败块。每次省略都有 recall。 |
 | `balanced` | 保留完整正文，只折叠确定性的重复/格式信息。 |
-| `safe` | 不截断查询正文；测试成功仍会折叠 RUN/PASS，有损候选需 recall。逐字审计用 `--raw`。 |
+| `lossless` | 仅对 `cat`/`tail`/`head` 的连续完全重复行做“行 + 次数”编码；不截断正文。 |
+| `safe` | 不做有损省略；rg 只做无损分组。逐字审计用 `--raw`。 |
 
 ```sh
 rtk-go exec --profile safe -- git diff
@@ -163,6 +168,7 @@ rtk-go exec --profile aggressive -- go test ./...
 | `go test` / `-v` | 成功折叠 RUN/PASS；aggressive 失败只留失败/跳过块与包汇总；panic/race 原文 |
 | pytest | 计数摘要、失败名/位置/断言，warnings 有界；collect-only 等原文 |
 | Node `--test` + TAP | 成功/失败聚合；单流 TAP、非 TAP reporter 原文 |
+| `cat` / `tail` / `head`（lossless） | 折叠连续完全重复行，保留行文本与次数；`-f`/`-F` 等流式选项原文 |
 | 未知命令 / 非 UTF-8 / 二进制 / 控制字符 / TTY | 原文 |
 
 详细行为见 [`docs/usage.md`](docs/usage.md)；过滤器的安全边界见 [`docs/security.md`](docs/security.md)。

@@ -74,6 +74,10 @@ func Select(argv []string, profile string) *Selection {
 				return &Selection{Filter: gitDiffFilter{}, Family: "git diff"}
 			}
 		}
+	case "cat", "tail", "head":
+		if profile == "lossless" && safeTextCommandArgs(prog, argv[1:]) {
+			return &Selection{Filter: logFilter{}, Family: "log repeats"}
+		}
 	case "rg":
 		if safeRGArgs(argv[1:]) {
 			aggressive := profile == "aggressive"
@@ -81,23 +85,23 @@ func Select(argv []string, profile string) *Selection {
 		}
 	case "go":
 		if len(argv) >= 2 && argv[1] == "test" {
-			if profile == "safe" || hasArg(argv[2:], "-c") || hasArg(argv[2:], "--compile-only") {
+			if profile == "safe" || profile == "lossless" || hasArg(argv[2:], "-c") || hasArg(argv[2:], "--compile-only") {
 				return nil
 			}
 			return &Selection{Filter: goTestFilter{json: hasArg(argv[2:], "-json"), aggressive: profile == "aggressive"}, Family: "go test", Test: true}
 		}
 	case "pytest", "py.test":
-		if profile == "safe" || !safePytestArgs(argv[1:]) {
+		if profile == "safe" || profile == "lossless" || !safePytestArgs(argv[1:]) {
 			return nil
 		}
 		return &Selection{Filter: pytestFilter{aggressive: profile == "aggressive"}, Family: "pytest", Test: true}
 	case "python", "python3":
-		if profile == "safe" || len(argv) < 3 || argv[1] != "-m" || argv[2] != "pytest" || !safePytestArgs(argv[3:]) {
+		if profile == "safe" || profile == "lossless" || len(argv) < 3 || argv[1] != "-m" || argv[2] != "pytest" || !safePytestArgs(argv[3:]) {
 			return nil
 		}
 		return &Selection{Filter: pytestFilter{aggressive: profile == "aggressive"}, Family: "pytest", Test: true}
 	case "node":
-		if profile == "safe" || !nodeTapArgs(argv[1:]) {
+		if profile == "safe" || profile == "lossless" || !nodeTapArgs(argv[1:]) {
 			return nil
 		}
 		return &Selection{Filter: nodeTAPFilter{}, Family: "node --test", Test: true}

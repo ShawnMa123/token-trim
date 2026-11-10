@@ -89,7 +89,7 @@ func (a *App) usage() {
 
 Usage:
   rtk-go <program> [args...]
-  rtk-go exec [--raw] [--no-store] [--profile safe|balanced|aggressive] [--encoding auto|utf-8] -- <program> [args...]
+  rtk-go exec [--raw] [--no-store] [--profile safe|balanced|aggressive|lossless] [--encoding auto|utf-8] -- <program> [args...]
   rtk-go bypass <program> [args...]
   rtk-go recall <id> [--stream stdout|stderr|both] [--offset N] [--limit N] [--raw]
   rtk-go rewrite --shell powershell|posix --command <text> --format json
@@ -141,8 +141,8 @@ func parseExecArgs(tokens []string) (execOptions, []string, error) {
 				i++
 				v = tokens[i]
 			}
-			if v != "safe" && v != "balanced" && v != "aggressive" {
-				return opts, nil, fmt.Errorf("exec: --profile must be safe, balanced, or aggressive")
+			if v != "safe" && v != "balanced" && v != "aggressive" && v != "lossless" {
+				return opts, nil, fmt.Errorf("exec: --profile must be safe, balanced, aggressive, or lossless")
 			}
 			opts.profile = v
 			i++

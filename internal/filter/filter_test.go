@@ -28,6 +28,8 @@ func TestSelect(t *testing.T) {
 		{[]string{"rg", "--pre", "./hook", "needle"}, "balanced", false},
 		{[]string{"go", "test", "./..."}, "balanced", true},
 		{[]string{"go", "test", "./..."}, "safe", false},
+		{[]string{"go", "test", "./..."}, "lossless", false},
+		{[]string{"pytest", "tests"}, "lossless", false},
 		{[]string{"pytest", "tests"}, "balanced", true},
 		{[]string{"python", "-m", "pytest"}, "balanced", true},
 		{[]string{"node", "--test", "--test-reporter=tap", "x.test.js"}, "balanced", true},

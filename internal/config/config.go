@@ -221,8 +221,8 @@ func (c Config) Validate() error {
 	if c.SchemaVersion != SchemaVersion {
 		add("schema_version", fmt.Sprintf("unsupported version %d", c.SchemaVersion))
 	}
-	if c.Profile != "safe" && c.Profile != "balanced" && c.Profile != "aggressive" {
-		add("profile", "must be safe, balanced, or aggressive")
+	if c.Profile != "safe" && c.Profile != "balanced" && c.Profile != "aggressive" && c.Profile != "lossless" {
+		add("profile", "must be safe, balanced, aggressive, or lossless")
 	}
 	if !(c.Storage.RetentionHours >= 1 && c.Storage.RetentionHours <= 168) {
 		add("storage.retention_hours", "must be 1..168")

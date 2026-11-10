@@ -66,7 +66,7 @@ Windows 示例：
 | 字段 | 默认 | 约束 | 说明 |
 |---|---:|---|---|
 | `schema_version` | `1` | 必须为 `1` | 配置契约版本 |
-| `profile` | `aggressive` | `safe`/`balanced`/`aggressive` | 默认过滤级别 |
+| `profile` | `aggressive` | `safe`/`lossless`/`balanced`/`aggressive` | 默认过滤级别 |
 | `storage.enabled` | `true` | bool | 是否允许原文落盘 |
 | `storage.data_dir` | 用户缓存 | 绝对路径 | recovery 根目录 |
 | `storage.retention_hours` | `24` | 1..168 | 原文保留时间 |

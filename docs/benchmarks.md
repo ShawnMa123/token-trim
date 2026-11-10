@@ -110,6 +110,37 @@ rtk-go 字节略低（237B vs 241B）。
 各轮命令数/模型路径不同，token 数字不用于节省对比；此项只验证事实保真与
 任务完成率没有回归。
 
+## F. 长日志 / 长文本（lossless）
+
+Fixture：约 299KB 日志（3000 行连续相同 heartbeat + 3 条 ERROR + 1 条 FATAL
+堆栈）加约 22KB 无重复行文章；要求模型只根据命令输出回答 4 个事实：
+
+- ERROR 行数；
+- FATAL 的 request id；
+- FATAL 后第二个栈帧；
+- 文章中的 audit window。
+
+| arm | 正确率 | input tokens 中位数 | 工具输出字节中位数 |
+|---|---:|---:|---:|
+| baseline `cat` | **1/3** | 22,570 | 299,094 |
+| `rtk-go --profile lossless` | **3/3** | 16,624 | 23,467 |
+
+baseline 的两次失败不是答错格式，而是原始 299KB 输出被 Codex 截断，模型只看到
+文章开头，无法看到 ERROR/FATAL；另一次重试拿到完整输出（126,817 input tokens，
+598KB 聚合输出）才答对。lossless 用连续重复行的 `line [rtk-go ×N]` 编码，把
+日志压到约 1.1KB，文章原样保留；3 次均在 16.6k input tokens 左右答对。
+
+这里收益来自**消除重复**，不是丢弃信息：行文本、顺序、重复次数都保留，原始字节
+仍可用 `recall` 回读。**长文本没有重复行时，lossless 会直接回退原文，收益为 0**；
+自然语言文章无法靠无损变换显著缩短。
+
+测试命令：
+
+```sh
+cd test/e2e
+RUNS=3 ./run-longlog.sh
+```
+
 ## 性能（3 warm-up + 25 samples）
 
 ### 常规 fixture

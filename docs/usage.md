@@ -52,11 +52,15 @@ rtk-go exec -- pytest -q tests
 rtk-go exec --profile safe -- git diff
 rtk-go exec --profile balanced -- go test ./...
 rtk-go exec --profile aggressive -- rg TODO src
+
+# 高重复日志：只折叠连续完全相同的行，不截断正文
+rtk-go exec --profile lossless -- tail -n 10000 app.log
 ```
 
 | profile | 行为 | 适用 |
 |---|---|---|
-| `safe` | 不截断查询正文；测试成功仍折叠 RUN/PASS，有损候选可 recall | 低风险审计；逐字用 `--raw` |
+| `safe` | 不做有损省略；rg 只做无损分组 | 逐字审计；需要完全原始字节时用 `--raw` |
+| `lossless` | 仅折叠 `cat`/`tail`/`head` 的连续完全重复行，保留行文本与总次数 | 高重复长日志；长文本通常无收益 |
 | `balanced` | 保留查询正文，折叠重复格式/测试进度 | 日常查询，偏保守 |
 | `aggressive` | 有界省略；所有省略可 recall | Codex token 优化（默认） |
 
@@ -136,9 +140,28 @@ rtk-go bypass go test ./...
 | `go test -json` | 解析已知事件流 | 未知事件/失败信号 → 原文 |
 | `pytest` | 计数摘要 | 失败名、位置、断言；warnings 有界 |
 | Node `--test` + TAP | 聚合通过/失败 | 非 TAP reporter、单流 TAP → 原文 |
+| `cat` / `tail` / `head` | `lossless` profile 折叠连续完全重复行 | 其他 profile/命令 → 原文 |
 
 构建命令（`go build`、`go vet` 等）目前不做自动改写；显式通过 `rtk-go exec --` 调用时，
 只有匹配安全矩阵的形态才会过滤。
+
+### 无损重复行折叠
+
+`--profile lossless` 只处理 `cat`、`tail`、`head`（必须带文件，拒绝 `-f`/`-F` 等流式选项）：
+
+```text
+相同的长行 × 1000
+```
+
+变为：
+
+```text
+相同的长行 [rtk-go ×1000]
+```
+
+行文本和总次数都保留，不是“省略后只剩一句”；但这不是逐字节相同的输出。需要原文字节时
+用 `--raw`，或从 recall 读取完整记录。短行、只出现一次的行、自然语言段落不会折叠；
+没有收益时自动回退原文。
 
 ### 透传
 

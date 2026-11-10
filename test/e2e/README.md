@@ -19,6 +19,7 @@ is used.
 | failure + diff | failing Go test package and large diff | `fixture-fail.sh` / `run-fail.sh` |
 | pytest | mixed passed/failed/skipped suite | `fixture-pytest.sh` / `run-pytest.sh` |
 | bug fix | model must fix a real failing test | `fixture-fix.sh` / `run-fix.sh` |
+| long log | repeated log lines + sparse facts + long article | `fixture-longlog.sh` / `run-longlog.sh` |
 
 Every arm uses the same fixture image and a fresh container. Results are written
 under `results*/` and are git-ignored.
@@ -58,6 +59,7 @@ Failure/diff, pytest, and bug-fix:
 RUNS=6 ./run-fail.sh
 RUNS=4 ./run-pytest.sh
 RUNS=3 ./run-fix.sh
+RUNS=3 ./run-longlog.sh
 ```
 
 Everything, including the wrapper microbenchmark:
