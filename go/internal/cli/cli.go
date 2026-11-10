@@ -326,8 +326,11 @@ func (a *App) execCommand(tokens []string, forceRaw bool) int {
 			res.ExitCode = 125
 		}
 	}
-	if res.OutputError != nil && res.ExitCode == 0 {
-		res.ExitCode = 125
+	if res.OutputError != nil {
+		fmt.Fprintf(a.Stderr, "rtk-go: output write failed: %v\n", res.OutputError)
+		if res.ExitCode == 0 {
+			res.ExitCode = 125
+		}
 	}
 
 	a.recordStats(cfg, cfgLoaded, id, started, sel, mode, parserID, fallbackReason, recoveryAvailable, res, emittedStdout)

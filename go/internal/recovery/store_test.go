@@ -1,6 +1,7 @@
 package recovery
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -45,26 +46,33 @@ func commitOne(t *testing.T, s *Store, stdout, stderr string) string {
 func TestCommitLoadRoundTrip(t *testing.T) {
 	s := newTestStore(t)
 	id := commitOne(t, s, "out\x00put", "warn\n")
-	rec, err := s.Load(id)
+	h, err := s.Open(id)
 	if err != nil {
-		t.Fatalf("load: %v", err)
+		t.Fatalf("open: %v", err)
 	}
-	if string(rec.Stdout) != "out\x00put" || string(rec.Stderr) != "warn\n" {
-		t.Fatalf("streams = %q / %q", rec.Stdout, rec.Stderr)
+	var stdout, stderr bytes.Buffer
+	if _, err := h.Raw("stdout", &stdout); err != nil {
+		t.Fatal(err)
 	}
-	if !rec.Complete || rec.ID != id || rec.Encoding != "utf-8" {
-		t.Fatalf("manifest = %+v", rec.Manifest)
+	if _, err := h.Raw("stderr", &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if stdout.String() != "out\x00put" || stderr.String() != "warn\n" {
+		t.Fatalf("streams = %q / %q", stdout.String(), stderr.String())
+	}
+	if !h.Complete || h.ID != id || h.Encoding != "utf-8" {
+		t.Fatalf("manifest = %+v", h.Manifest)
 	}
 }
 
 func TestLoadRejectsTraversalAndMissing(t *testing.T) {
 	s := newTestStore(t)
 	for _, id := range []string{"", "../x", strings.Repeat("a", 31), strings.Repeat("A", 32), "/abs", strings.Repeat("a", 32) + "/"} {
-		if _, err := s.Load(id); err == nil {
-			t.Errorf("Load(%q) succeeded", id)
+		if _, err := s.Open(id); err == nil {
+			t.Errorf("Open(%q) succeeded", id)
 		}
 	}
-	if _, err := s.Load(strings.Repeat("b", 32)); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Open(strings.Repeat("b", 32)); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing record err = %v", err)
 	}
 }
@@ -76,7 +84,7 @@ func TestDigestMismatchIsCorrupt(t *testing.T) {
 	if err := os.WriteFile(p, []byte("tampered"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Load(id); !errors.Is(err, ErrCorrupt) {
+	if _, err := s.Open(id); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -86,11 +94,11 @@ func TestExpiredRecord(t *testing.T) {
 	base := time.Now()
 	s.Now = func() time.Time { return base }
 	id := commitOne(t, s, "x", "")
-	if _, err := s.Load(id); err != nil {
-		t.Fatalf("fresh load: %v", err)
+	if _, err := s.Open(id); err != nil {
+		t.Fatalf("fresh open: %v", err)
 	}
 	s.Now = func() time.Time { return base.Add(25 * time.Hour) }
-	if _, err := s.Load(id); !errors.Is(err, ErrExpired) {
+	if _, err := s.Open(id); !errors.Is(err, ErrExpired) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -106,7 +114,7 @@ func TestPartialIsNeverRecoverable(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(s.runsDir(), id)); err == nil {
 		t.Fatal("unexpected committed record")
 	}
-	if _, err := s.Load(id); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Open(id); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -232,7 +240,7 @@ func TestCleanExpiredOnly(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(s.runsDir(), expired)); err == nil {
 		t.Fatalf("expired record %s survived cleanup", expired)
 	}
-	if _, err := s.Load(valid); err != nil {
+	if _, err := s.Open(valid); err != nil {
 		t.Fatalf("valid record removed: %v", err)
 	}
 }
@@ -245,7 +253,7 @@ func TestValidRecordSurvivesCleanup(t *testing.T) {
 	if _, err := s.CleanExpired(false, base.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Load(id); err != nil {
+	if _, err := s.Open(id); err != nil {
 		t.Fatalf("valid record removed: %v", err)
 	}
 }
@@ -261,7 +269,7 @@ func TestSymlinkRunDirRejected(t *testing.T) {
 	if err := os.Symlink(moved, dir); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	if _, err := s.Load(id); !errors.Is(err, ErrCorrupt) {
+	if _, err := s.Open(id); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("err = %v", err)
 	}
 	if _, err := s.CleanExpired(false, time.Now().Add(48*time.Hour)); err != nil {

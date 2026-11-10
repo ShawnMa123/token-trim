@@ -32,12 +32,24 @@ func TestSelect(t *testing.T) {
 		{[]string{"node", "--test", "x.test.js"}, "balanced", false},
 		{[]string{"npm", "test"}, "balanced", false},
 		{[]string{"pytest"}, "safe", false},
+		{[]string{"pytest", "--collect-only"}, "balanced", false},
+		{[]string{"go", "test", "-c", "./..."}, "balanced", false},
+		{[]string{"python", "-m", "pytest", "--fixtures"}, "balanced", false},
 	}
 	for _, tc := range cases {
 		got := Select(tc.argv, tc.profile) != nil
 		if got != tc.want {
 			t.Errorf("Select(%q, %s) = %v, want %v", tc.argv, tc.profile, got, tc.want)
 		}
+	}
+}
+
+func TestSanitizeLoneCarriageReturn(t *testing.T) {
+	if _, why := sanitize([]byte("progress 10%\rprogress 20%")); why == "" {
+		t.Fatal("lone carriage return must force raw output")
+	}
+	if _, why := sanitize([]byte("line\r\nnext\r\n")); why != "" {
+		t.Fatalf("CRLF should be accepted: %s", why)
 	}
 }
 
@@ -118,6 +130,36 @@ func TestGitStatusKeepsAllPaths(t *testing.T) {
 	}
 	if !out.Lossy || out.RemovedLines == 0 {
 		t.Fatalf("expected lossy output: %+v", out)
+	}
+}
+
+func TestGitStatusConflictDetachedAndClean(t *testing.T) {
+	conflict := `HEAD detached at abc123
+You have unmerged paths.
+  (fix conflicts and run "git commit")
+
+Unmerged paths:
+  (use "git add <file>..." to mark resolution)
+	both modified:   src/conflict.go
+	both added:      docs/new notes.txt
+`
+	out, why := Run(gitStatusFilter{}, Input{Stdout: []byte(conflict)})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	for _, want := range []string{"HEAD detached at abc123", "You have unmerged paths.", "both modified:   src/conflict.go", "both added:      docs/new notes.txt"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("lost %q:\n%s", want, text)
+		}
+	}
+	clean := "On branch main\nnothing to commit, working tree clean\n"
+	out, why = Run(gitStatusFilter{}, Input{Stdout: []byte(clean)})
+	if why != "" {
+		t.Fatalf("clean fallback: %s", why)
+	}
+	if !strings.Contains(string(out.Text), "nothing to commit, working tree clean") {
+		t.Fatalf("clean candidate = %q", out.Text)
 	}
 }
 
@@ -353,5 +395,105 @@ func TestNodeTAPKeepsFailuresAndSummary(t *testing.T) {
 	}
 	if _, why := Run(nodeTAPFilter{}, Input{Stdout: []byte("TAP version 14\n# unknown thing\n1..1\n# tests 1\n")}); why == "" {
 		t.Fatal("unknown TAP comment must fall back")
+	}
+}
+
+func TestGoTestTextKeepsSkipsAndWarnings(t *testing.T) {
+	body := "=== RUN   TestA\n--- PASS: TestA (0.00s)\n=== RUN   TestB\n--- SKIP: TestB (0.00s)\n    skip_reason.go:10: not today\nPASS\nok  \tpkg\t0.01s\n"
+	out, why := Run(goTestFilter{}, Input{ExitCode: 0, Stdout: []byte(body)})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	for _, want := range []string{"--- SKIP: TestB", "not today", "ok  \tpkg"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("lost %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestGoTestJSONSkip(t *testing.T) {
+	body := strings.Join([]string{
+		`{"Action":"start","Package":"p"}`,
+		`{"Action":"run","Package":"p","Test":"TestA"}`,
+		`{"Action":"pass","Package":"p","Test":"TestA","Elapsed":0}`,
+		`{"Action":"run","Package":"p","Test":"TestB"}`,
+		`{"Action":"output","Package":"p","Test":"TestB","Output":"reason: not ready\n"}`,
+		`{"Action":"skip","Package":"p","Test":"TestB","Elapsed":0}`,
+		`{"Action":"pass","Package":"p","Elapsed":0.01}`,
+	}, "\n") + "\n"
+	out, why := Run(goTestFilter{json: true}, Input{ExitCode: 0, Stdout: []byte(body)})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	if !strings.Contains(text, "skip p TestB") || !strings.Contains(text, "reason: not ready") {
+		t.Fatalf("candidate = %q", text)
+	}
+}
+
+func TestPytestWarningsSkipsAndCollectionError(t *testing.T) {
+	body := `============================= test session starts ==============================
+platform win32 -- Python 3.11.0
+rootdir: C:\proj
+collected 2 items
+
+test_a.py .s                                                              [100%]
+
+=============================== warnings summary ===============================
+test_a.py:1
+  PytestWarning: synthetic
+
+-- Docs: https://docs.pytest.org/
+=========================== short test summary info ============================
+SKIPPED [1] test_a.py:5: not ready
+======================= 1 passed, 1 skipped, 1 warning in 0.05s =======================
+`
+	out, why := Run(pytestFilter{}, Input{ExitCode: 0, Stdout: []byte(body)})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	for _, want := range []string{"warnings summary", "PytestWarning: synthetic", "SKIPPED [1] test_a.py:5: not ready", "1 passed, 1 skipped, 1 warning"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("lost %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "platform win32") {
+		t.Error("platform banner survived")
+	}
+}
+
+func TestNodeTAPSkipTodo(t *testing.T) {
+	body := `TAP version 14
+ok 1 - normal
+  ---
+  duration_ms: 1
+  ...
+ok 2 - skipped # SKIP not ready
+  ---
+  duration_ms: 0
+  ...
+ok 3 - todo # TODO later
+1..3
+# tests 3
+# pass 1
+# fail 0
+# skipped 1
+# todo 1
+# duration_ms 10
+`
+	out, why := Run(nodeTAPFilter{}, Input{ExitCode: 0, Stdout: []byte(body)})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	for _, want := range []string{"ok 2 - skipped # SKIP not ready", "ok 3 - todo # TODO later", "# skipped 1", "# todo 1"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("lost %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "ok 1 - normal") {
+		t.Error("passing block survived")
 	}
 }

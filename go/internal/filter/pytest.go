@@ -83,12 +83,14 @@ func (pytestFilter) Apply(in Input) (Output, error) {
 func isPytestPreamble(line string) bool {
 	prefixes := []string{
 		"platform ", "rootdir:", "configfile:", "plugins:", "collected ", "cachedir:",
-		"test session starts", "Test session starts",
 	}
 	for _, p := range prefixes {
 		if strings.HasPrefix(line, p) {
 			return true
 		}
+	}
+	if strings.Contains(line, "test session starts") || strings.Contains(line, "Test session starts") {
+		return true
 	}
 	if pytestProgress.MatchString(line) {
 		return true

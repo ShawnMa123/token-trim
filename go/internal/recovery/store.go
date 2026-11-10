@@ -222,6 +222,9 @@ func (r *Reservation) Commit(id string, stdout, stderr []byte, exitCode int, enc
 	if r == nil {
 		return Manifest{}, ErrDisabled
 	}
+	if r.runID != "" && id != r.runID {
+		return Manifest{}, fmt.Errorf("recovery id does not match the reservation")
+	}
 	s := r.store
 	if !ValidID(id) {
 		return Manifest{}, fmt.Errorf("invalid recovery id")
@@ -277,54 +280,6 @@ func (r *Reservation) Commit(id string, stdout, stderr []byte, exitCode int, enc
 	return m, nil
 }
 
-// Record is a verified recovery record loaded in memory.
-type Record struct {
-	Manifest
-	Stdout []byte
-	Stderr []byte
-}
-
-// Load verifies id, containment, expiry, sizes, and digests, then returns the
-// complete streams. It never executes the original command.
-func (s *Store) Load(id string) (*Record, error) {
-	if !ValidID(id) {
-		return nil, fmt.Errorf("invalid recovery id")
-	}
-	dir, err := s.containedRunDir(id)
-	if err != nil {
-		return nil, err
-	}
-	mb, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	var m Manifest
-	if err := json.Unmarshal(mb, &m); err != nil {
-		return nil, fmt.Errorf("%w: manifest", ErrCorrupt)
-	}
-	if m.Schema != Schema || m.ID != id || !m.Complete {
-		return nil, fmt.Errorf("%w: incomplete or unsupported record", ErrCorrupt)
-	}
-	if s.now().After(m.ExpiresAt) {
-		return nil, ErrExpired
-	}
-	stdout, err := readVerified(filepath.Join(dir, "stdout.bin"), m.StdoutBytes, m.StdoutSHA256)
-	if err != nil {
-		return nil, err
-	}
-	var stderr []byte
-	if m.StderrBytes > 0 {
-		stderr, err = readVerified(filepath.Join(dir, "stderr.bin"), m.StderrBytes, m.StderrSHA256)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &Record{Manifest: m, Stdout: stdout, Stderr: stderr}, nil
-}
-
 func (s *Store) containedRunDir(id string) (string, error) {
 	rootReal, err := filepath.EvalSymlinks(s.Root)
 	if err != nil {
@@ -360,25 +315,6 @@ func within(root, p string) bool {
 		return false
 	}
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
-// readVerified rejects records whose size or digest do not match.
-func readVerified(path string, size int64, wantDigest string) ([]byte, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrCorrupt, err)
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%w: stream is not a regular file", ErrCorrupt)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrCorrupt, err)
-	}
-	if int64(len(data)) != size || digest(data) != wantDigest {
-		return nil, fmt.Errorf("%w: digest mismatch", ErrCorrupt)
-	}
-	return data, nil
 }
 
 func digest(b []byte) string {

@@ -47,11 +47,6 @@ func Analyze(shell, command, binary string, allowTests bool) RewriteResult {
 	if !ok || len(tokens) == 0 {
 		return pass("unparseable shell syntax")
 	}
-	for _, t := range tokens {
-		if t == "" {
-			continue
-		}
-	}
 	prog := strings.ToLower(strings.TrimSuffix(filepath.Base(tokens[0]), ".exe"))
 	if prog != "git" && prog != "rg" {
 		return pass("unsupported program")
