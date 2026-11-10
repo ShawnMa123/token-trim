@@ -14,8 +14,9 @@ COPY --from=build /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:/usr/local/bin:$PATH
 RUN ln -sf /usr/local/go/bin/go /usr/local/bin/go
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates git ripgrep \
+ && apt-get install -y --no-install-recommends ca-certificates git ripgrep python3 python3-pip \
  && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --break-system-packages pytest
 RUN npm install -g @openai/codex@0.163.0
 COPY --from=build /out/rtk-go /usr/local/bin/rtk-go
 COPY --from=build /out/bench /usr/local/bin/bench

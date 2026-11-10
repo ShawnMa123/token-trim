@@ -183,21 +183,33 @@ func renderPytestAggressive(lines []string, summaryIdx int) (Output, error) {
 				label = "ERROR"
 			}
 			out = append(out, fmt.Sprintf("%d. [%s] %s", i+1, label, truncateString(name, 120)))
-			kept := 0
+			var loc, errs, misc []string
 			for _, l := range lines[1:] {
-				if kept >= 3 {
-					break
-				}
 				t := strings.TrimSpace(l)
-				if t == "" {
-					continue
-				}
-				if strings.Contains(t, ".py:") || strings.HasPrefix(t, "E ") ||
-					strings.Contains(strings.ToLower(t), "assert") {
-					out = append(out, "   "+truncateString(t, 120))
-					kept++
+				switch {
+				case t == "":
+				case strings.Contains(t, ".py:"):
+					loc = append(loc, t)
+				case strings.HasPrefix(t, "E "):
+					errs = append(errs, t)
+				case strings.HasPrefix(t, ">") || strings.Contains(strings.ToLower(t), "assert"):
+					misc = append(misc, t)
 				}
 			}
+			kept := 0
+			add := func(vals []string, max int) {
+				for _, t := range vals {
+					if kept >= 3 || max <= 0 {
+						break
+					}
+					out = append(out, "   "+truncateString(t, 120))
+					kept++
+					max--
+				}
+			}
+			add(loc, 1)
+			add(errs, 2)
+			add(misc, 3-kept)
 		}
 	}
 	// If failures were parsed, the short summary duplicates them; keep it only

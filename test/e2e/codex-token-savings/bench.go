@@ -96,15 +96,37 @@ func main() {
 	for i := range cases {
 		if cases[i].name == "go-test" {
 			if _, err := os.Stat("/work/gen"); err != nil {
-				for j := range cases[i].arms {
-					for k := range cases[i].arms[j].argv {
-						if cases[i].arms[j].argv[k] == "./gen" {
-							cases[i].arms[j].argv[k] = "./genok"
+				if _, err := os.Stat("/work/genok"); err == nil {
+					for j := range cases[i].arms {
+						for k := range cases[i].arms[j].argv {
+							if cases[i].arms[j].argv[k] == "./gen" {
+								cases[i].arms[j].argv[k] = "./genok"
+							}
 						}
 					}
+				} else {
+					cases[i].name = ""
 				}
 			}
 		}
+	}
+	filtered := cases[:0]
+	for _, c := range cases {
+		if c.name != "" {
+			filtered = append(filtered, c)
+		}
+	}
+	cases = filtered
+	if _, err := os.Stat("/work/tests/test_many.py"); err == nil {
+		cases = append(cases, benchCase{
+			name: "pytest",
+			dir:  "/work",
+			arms: []arm{
+				{"direct", []string{"pytest", "tests"}},
+				{"rtk-go", []string{"rtk-go", "exec", "--", "pytest", "tests"}},
+				{"rtk", []string{"rtk", "pytest", "tests"}},
+			},
+		})
 	}
 	if _, err := os.Stat("/work/genfail"); err == nil {
 		cases = append(cases,
