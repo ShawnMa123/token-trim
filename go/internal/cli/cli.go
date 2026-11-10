@@ -89,7 +89,7 @@ func (a *App) usage() {
 
 Usage:
   rtk-go <program> [args...]
-  rtk-go exec [--raw] [--no-store] [--profile safe|balanced] [--encoding auto|utf-8] -- <program> [args...]
+  rtk-go exec [--raw] [--no-store] [--profile safe|balanced|aggressive] [--encoding auto|utf-8] -- <program> [args...]
   rtk-go bypass <program> [args...]
   rtk-go recall <id> [--stream stdout|stderr|both] [--offset N] [--limit N] [--raw]
   rtk-go rewrite --shell powershell|posix --command <text> --format json
