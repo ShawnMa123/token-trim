@@ -309,6 +309,9 @@ func sanitize(b []byte) ([]byte, string) {
 			i = j
 			continue
 		}
+		if c == '\r' && (i+1 >= len(b) || b[i+1] != '\n') {
+			return nil, "carriage-return progress output"
+		}
 		if c < 0x20 && c != '\n' && c != '\r' && c != '\t' {
 			return nil, "control characters"
 		}

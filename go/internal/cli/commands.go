@@ -82,6 +82,10 @@ func (a *App) recall(args []string) int {
 		fmt.Fprintln(a.Stderr, "rtk-go recall: missing id")
 		return 2
 	}
+	if !recovery.ValidID(id) {
+		fmt.Fprintln(a.Stderr, "rtk-go recall: invalid id (expected 32 lowercase hex characters)")
+		return 2
+	}
 	if stream != "stdout" && stream != "stderr" && stream != "both" {
 		fmt.Fprintln(a.Stderr, "rtk-go recall: --stream must be stdout, stderr, or both")
 		return 2

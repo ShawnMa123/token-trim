@@ -112,7 +112,10 @@ func (c *stdoutCapture) writeLocked(p []byte) {
 	if c.writeErr != nil {
 		return
 	}
-	if _, err := c.out.Write(p); err != nil {
+	if n, err := c.out.Write(p); err != nil || n != len(p) {
+		if err == nil {
+			err = io.ErrShortWrite
+		}
 		c.writeErr = err
 		c.once.Do(func() { close(c.errCh) })
 	}
@@ -192,7 +195,10 @@ func (m *mirrorWriter) write(p []byte) {
 	defer m.mu.Unlock()
 	m.total += int64(len(p))
 	if m.writeErr == nil {
-		if _, err := m.out.Write(p); err != nil {
+		if n, err := m.out.Write(p); err != nil || n != len(p) {
+			if err == nil {
+				err = io.ErrShortWrite
+			}
 			m.writeErr = err
 			m.once.Do(func() { close(m.errCh) })
 		}

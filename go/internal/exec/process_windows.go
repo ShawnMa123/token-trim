@@ -20,15 +20,15 @@ const (
 )
 
 var (
-	kernel32                        = syscall.NewLazyDLL("kernel32.dll")
-	procCreateJobObjectW            = kernel32.NewProc("CreateJobObjectW")
-	procSetInformationJobObject     = kernel32.NewProc("SetInformationJobObject")
-	procAssignProcessToJobObject    = kernel32.NewProc("AssignProcessToJobObject")
-	procTerminateJobObject          = kernel32.NewProc("TerminateJobObject")
-	procOpenThread                  = kernel32.NewProc("OpenThread")
-	procResumeThread                = kernel32.NewProc("ResumeThread")
-	procThread32First               = kernel32.NewProc("Thread32First")
-	procThread32Next                = kernel32.NewProc("Thread32Next")
+	kernel32                     = syscall.NewLazyDLL("kernel32.dll")
+	procCreateJobObjectW         = kernel32.NewProc("CreateJobObjectW")
+	procSetInformationJobObject  = kernel32.NewProc("SetInformationJobObject")
+	procAssignProcessToJobObject = kernel32.NewProc("AssignProcessToJobObject")
+	procTerminateJobObject       = kernel32.NewProc("TerminateJobObject")
+	procOpenThread               = kernel32.NewProc("OpenThread")
+	procResumeThread             = kernel32.NewProc("ResumeThread")
+	procThread32First            = kernel32.NewProc("Thread32First")
+	procThread32Next             = kernel32.NewProc("Thread32Next")
 )
 
 type jobBasicLimit struct {

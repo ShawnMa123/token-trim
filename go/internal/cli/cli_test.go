@@ -170,7 +170,7 @@ func TestRecallMissingAndTraversal(t *testing.T) {
 		t.Fatalf("code=%d err=%q", code, errOut)
 	}
 	code, _, _ = runCLI("recall", "../etc/passwd")
-	if code != 1 {
+	if code != 2 {
 		t.Fatalf("traversal code=%d", code)
 	}
 }

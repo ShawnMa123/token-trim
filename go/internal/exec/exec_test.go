@@ -171,10 +171,10 @@ func TestArgvCwdEnvStdinFidelity(t *testing.T) {
 func TestBothPipesExceedCapacity(t *testing.T) {
 	var out, errOut bytes.Buffer
 	res := Run(context.Background(), Spec{
-		Program: helperExe,
-		Env:     append(os.Environ(), "RTK_EXEC_HELPER=both"),
-		Stdout:  &out,
-		Stderr:  &errOut,
+		Program:     helperExe,
+		Env:         append(os.Environ(), "RTK_EXEC_HELPER=both"),
+		Stdout:      &out,
+		Stderr:      &errOut,
 		MirrorLimit: 64 * 1024 * 1024,
 	})
 	if res.ExitCode != 0 {

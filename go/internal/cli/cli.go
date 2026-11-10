@@ -305,6 +305,9 @@ func (a *App) execCommand(tokens []string, forceRaw bool) int {
 		}
 		n, err := a.Stdout.Write(finalOut)
 		emittedStdout = int64(n)
+		if err == nil && n != len(finalOut) {
+			err = io.ErrShortWrite
+		}
 		writeErr = err
 	} else if sel != nil && capture == nil && captureReason != "" {
 		mode = "fallback"
