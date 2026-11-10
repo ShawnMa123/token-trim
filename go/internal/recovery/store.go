@@ -52,19 +52,21 @@ type Manifest struct {
 
 // Store owns one private data root.
 type Store struct {
-	Root       string
-	TotalBytes int64
-	Retention  time.Duration
-	Now        func() time.Time
+	Root        string
+	TotalBytes  int64
+	Retention   time.Duration
+	LockTimeout time.Duration
+	Now         func() time.Time
 }
 
 // New builds a store. Callers must run Prepare (or Acquire) before writing.
 func New(root string, totalMiB, retentionHours int) *Store {
 	return &Store{
-		Root:       root,
-		TotalBytes: int64(totalMiB) << 20,
-		Retention:  time.Duration(retentionHours) * time.Hour,
-		Now:        time.Now,
+		Root:        root,
+		TotalBytes:  int64(totalMiB) << 20,
+		Retention:   time.Duration(retentionHours) * time.Hour,
+		LockTimeout: 200 * time.Millisecond,
+		Now:         time.Now,
 	}
 }
 
@@ -442,7 +444,11 @@ func (s *Store) lock() (func(), bool) {
 	if err := os.MkdirAll(filepath.Join(s.Root, "locks"), 0o700); err != nil {
 		return nil, false
 	}
-	deadline := time.Now().Add(200 * time.Millisecond)
+	timeout := s.LockTimeout
+	if timeout <= 0 {
+		timeout = 200 * time.Millisecond
+	}
+	deadline := time.Now().Add(timeout)
 	for {
 		if err := os.Mkdir(s.lockPath(), 0o700); err == nil {
 			return func() { _ = os.Remove(s.lockPath()) }, true
@@ -481,7 +487,7 @@ func (s *Store) purgeStaleLeases() {
 
 func (s *Store) usage() (int64, error) {
 	var total int64
-	for _, dir := range []string{s.runsDir(), s.statsDir(), s.leasesDir()} {
+	for _, dir := range []string{s.runsDir(), s.statsDir()} {
 		n, err := dirSize(dir)
 		if err != nil {
 			return 0, err
@@ -495,6 +501,28 @@ func (s *Store) usage() (int64, error) {
 	for _, p := range partials {
 		n, _ := dirSize(p)
 		total += n
+	}
+	// Active reservations count at their reserved size, not their tiny lease
+	// metadata. This keeps the 256 MiB budget at four 64 MiB reservations.
+	leases, err := os.ReadDir(s.leasesDir())
+	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			return 0, err
+		}
+		return total, nil
+	}
+	for _, e := range leases {
+		if e.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.leasesDir(), e.Name()))
+		if err != nil {
+			continue
+		}
+		var l leaseFile
+		if json.Unmarshal(data, &l) == nil {
+			total += l.Bytes
+		}
 	}
 	return total, nil
 }

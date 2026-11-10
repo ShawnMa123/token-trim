@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -124,6 +125,69 @@ func TestQuotaReservation(t *testing.T) {
 	r1.Release()
 	if _, ok := s.Acquire(id2); !ok {
 		t.Fatal("acquire after release failed")
+	}
+}
+
+func TestConcurrentReservationsStopAtBudget(t *testing.T) {
+	s := newTestStoreWith(t, 256)
+	s.LockTimeout = 10 * time.Second
+	const n = 32
+	results := make(chan *Reservation, n)
+	var wg sync.WaitGroup
+	for range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			id, err := NewID()
+			if err != nil {
+				results <- nil
+				return
+			}
+			r, ok := s.Acquire(id)
+			if !ok {
+				results <- nil
+				return
+			}
+			results <- r
+		}()
+	}
+	wg.Wait()
+	close(results)
+	granted := 0
+	for r := range results {
+		if r != nil {
+			granted++
+			r.Release()
+		}
+	}
+	// Contended processes may degrade to raw; the hard invariant is that no
+	// more than four 64 MiB reservations fit in 256 MiB.
+	if granted < 1 || granted > 4 {
+		t.Fatalf("granted %d reservations, want 1..4", granted)
+	}
+}
+
+func TestSequentialReservationBudget(t *testing.T) {
+	s := newTestStoreWith(t, 256)
+	var held []*Reservation
+	for range 4 {
+		id, _ := NewID()
+		r, ok := s.Acquire(id)
+		if !ok {
+			t.Fatalf("reservation %d failed before the budget was full", len(held)+1)
+		}
+		held = append(held, r)
+	}
+	id, _ := NewID()
+	if _, ok := s.Acquire(id); ok {
+		t.Fatal("fifth 64 MiB reservation exceeded 256 MiB")
+	}
+	for _, r := range held {
+		r.Release()
+	}
+	id, _ = NewID()
+	if _, ok := s.Acquire(id); !ok {
+		t.Fatal("reservation failed after releasing the budget")
 	}
 }
 
