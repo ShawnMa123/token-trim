@@ -75,7 +75,7 @@ type Loaded struct {
 func Default() Config {
 	c := Config{
 		SchemaVersion: SchemaVersion,
-		Profile:       "balanced",
+		Profile:       "aggressive",
 		Storage: Storage{
 			Enabled:        true,
 			RetentionHours: 24,
@@ -221,8 +221,8 @@ func (c Config) Validate() error {
 	if c.SchemaVersion != SchemaVersion {
 		add("schema_version", fmt.Sprintf("unsupported version %d", c.SchemaVersion))
 	}
-	if c.Profile != "safe" && c.Profile != "balanced" {
-		add("profile", "must be safe or balanced")
+	if c.Profile != "safe" && c.Profile != "balanced" && c.Profile != "aggressive" {
+		add("profile", "must be safe, balanced, or aggressive")
 	}
 	if !(c.Storage.RetentionHours >= 1 && c.Storage.RetentionHours <= 168) {
 		add("storage.retention_hours", "must be 1..168")

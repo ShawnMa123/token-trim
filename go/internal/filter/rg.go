@@ -5,11 +5,19 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
-// rgFilter groups losslessly by path: every match line, line/column number,
-// and order is preserved.
-type rgFilter struct{}
+// rgFilter groups losslessly by path. In aggressive mode it also caps the
+// number of files/matches and truncates very long match lines; hidden content
+// is recoverable from the committed original.
+type rgFilter struct{ aggressive bool }
+
+const (
+	rgMaxFiles     = 10
+	rgMaxMatches   = 200
+	rgMaxLineBytes = 160
+)
 
 func (rgFilter) ID() string { return "rg/v1" }
 
@@ -23,7 +31,7 @@ type rgMatch struct {
 	body string
 }
 
-func (rgFilter) Apply(in Input) (Output, error) {
+func (f rgFilter) Apply(in Input) (Output, error) {
 	lines := splitLines(string(in.Stdout))
 	if len(lines) == 0 {
 		return Output{}, fmt.Errorf("no matches")
@@ -39,6 +47,47 @@ func (rgFilter) Apply(in Input) (Output, error) {
 		}
 		matches = append(matches, m)
 	}
+	if !f.aggressive {
+		return renderRGGroups(matches, len(matches), len(matches)), nil
+	}
+	truncated := 0
+	for i := range matches {
+		if len(matches[i].body) > rgMaxLineBytes {
+			matches[i].body = truncateUTF8(matches[i].body, rgMaxLineBytes) + "..."
+			truncated++
+		}
+	}
+	files := 0
+	shown := 0
+	lastPath := ""
+	for _, m := range matches {
+		if m.path != lastPath {
+			if files >= rgMaxFiles {
+				break
+			}
+			files++
+			lastPath = m.path
+		}
+		if shown >= rgMaxMatches {
+			break
+		}
+		shown++
+	}
+	out := renderRGGroups(matches[:shown], shown, len(matches))
+	if shown < len(matches) {
+		hiddenFiles := countDistinctPaths(matches[shown:])
+		out.Text = joinLines(append(splitLines(string(out.Text)), fmt.Sprintf("+%d more files, %d matches hidden", hiddenFiles, len(matches)-shown)))
+		out.Lossy = true
+		out.RemovedLines += len(matches) - shown
+	}
+	if truncated > 0 {
+		out.Lossy = true
+		out.RemovedLines += truncated
+	}
+	return out, nil
+}
+
+func renderRGGroups(matches []rgMatch, shown, total int) Output {
 	var out []string
 	i := 0
 	for i < len(matches) {
@@ -52,9 +101,31 @@ func (rgFilter) Apply(in Input) (Output, error) {
 		}
 		i = j
 	}
-	// Grouping is lossless: each path is recoverable from its heading, and
-	// every match body, line/column, and order is preserved. No recovery hint.
-	return Output{Text: joinLines(out)}, nil
+	// Grouping is lossless when every match is shown.
+	return Output{Text: joinLines(out), Lossy: false}
+}
+
+func countDistinctPaths(matches []rgMatch) int {
+	n := 0
+	last := ""
+	for _, m := range matches {
+		if m.path != last {
+			n++
+			last = m.path
+		}
+	}
+	return n
+}
+
+func truncateUTF8(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	cut := max
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
 }
 
 func parseRGLine(line string) (rgMatch, bool) {

@@ -16,6 +16,7 @@ type Input struct {
 	Argv     []string
 	ExitCode int
 	Stdout   []byte
+	Profile  string
 }
 
 // Output is a filter candidate plus provenance.
@@ -60,23 +61,28 @@ func Select(argv []string, profile string) *Selection {
 		switch sub {
 		case "status":
 			if len(rest) == 0 || (len(rest) == 1 && rest[0] == "--long") {
-				return &Selection{Filter: gitStatusFilter{}, Family: "git status"}
+				return &Selection{Filter: gitStatusFilter{compact: profile == "aggressive"}, Family: "git status"}
 			}
 		case "log":
 			if safeLogArgs(rest) {
 				return &Selection{Filter: gitLogFilter{}, Family: "git log"}
 			}
+		case "diff":
+			if profile == "aggressive" && safeDiffArgs(rest) {
+				return &Selection{Filter: gitDiffFilter{}, Family: "git diff"}
+			}
 		}
 	case "rg":
 		if safeRGArgs(argv[1:]) {
-			return &Selection{Filter: rgFilter{}, Family: "rg", Lossless: true}
+			aggressive := profile == "aggressive"
+			return &Selection{Filter: rgFilter{aggressive: aggressive}, Family: "rg", Lossless: !aggressive}
 		}
 	case "go":
 		if len(argv) >= 2 && argv[1] == "test" {
 			if profile == "safe" || hasArg(argv[2:], "-c") || hasArg(argv[2:], "--compile-only") {
 				return nil
 			}
-			return &Selection{Filter: goTestFilter{json: hasArg(argv[2:], "-json")}, Family: "go test", Test: true}
+			return &Selection{Filter: goTestFilter{json: hasArg(argv[2:], "-json"), aggressive: profile == "aggressive"}, Family: "go test", Test: true}
 		}
 	case "pytest", "py.test":
 		if profile == "safe" || !safePytestArgs(argv[1:]) {
@@ -108,7 +114,7 @@ func splitGitArgs(argv []string) (string, []string, bool) {
 			i++
 		case strings.HasPrefix(a, "--git-dir=") || strings.HasPrefix(a, "--work-tree="):
 		case a == "--no-pager" || a == "--paginate":
-		case a == "status" || a == "log":
+		case a == "status" || a == "log" || a == "diff":
 			return a, argv[i+1:], true
 		default:
 			return "", nil, false
@@ -224,6 +230,35 @@ func nodeTapArgs(args []string) bool {
 		}
 	}
 	return isTest && reporters == 1 && tap
+}
+
+func safeDiffArgs(args []string) bool {
+	afterDash := false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if afterDash {
+			continue
+		}
+		switch {
+		case a == "--":
+			afterDash = true
+		case a == "--cached" || a == "--staged" || a == "--no-color" || a == "--color=never" || a == "-R":
+		case strings.HasPrefix(a, "-U"):
+		case a == "-U":
+			i++
+		case a == "--unified" || a == "--unified=":
+			if a == "--unified" {
+				i++
+			}
+		case a == "--stat" || a == "--name-only" || a == "--name-status" || a == "--raw" ||
+			a == "--numstat" || a == "--shortstat" || a == "--word-diff" || a == "--word-diff-regex" ||
+			a == "--binary" || strings.HasPrefix(a, "--color") && a != "--color=never":
+			return false
+		case strings.HasPrefix(a, "-"):
+			return false
+		}
+	}
+	return true
 }
 
 func safePytestArgs(args []string) bool {

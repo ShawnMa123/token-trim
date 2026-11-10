@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -495,5 +496,157 @@ ok 3 - todo # TODO later
 	}
 	if strings.Contains(text, "ok 1 - normal") {
 		t.Error("passing block survived")
+	}
+}
+
+func TestSelectAggressiveDiffAndRG(t *testing.T) {
+	if Select([]string{"git", "diff"}, "balanced") != nil {
+		t.Fatal("balanced must not select git diff")
+	}
+	if s := Select([]string{"git", "diff", "--", "file"}, "aggressive"); s == nil {
+		t.Fatal("aggressive should select git diff")
+	}
+	if Select([]string{"git", "diff", "--stat"}, "aggressive") != nil {
+		t.Fatal("--stat must stay raw")
+	}
+	if Select([]string{"git", "diff", "--word-diff"}, "aggressive") != nil {
+		t.Fatal("--word-diff must stay raw")
+	}
+	if s := Select([]string{"rg", "needle"}, "aggressive"); s == nil || s.Lossless {
+		t.Fatalf("aggressive rg should be lossy-capable: %+v", s)
+	}
+}
+
+func TestGitStatusCompact(t *testing.T) {
+	out, why := Run(gitStatusFilter{compact: true}, Input{Stdout: []byte(statusFixture), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	for _, want := range []string{
+		"## main ahead=2",
+		"M  src/a b.go",
+		"A  \"中文 文件.txt\"",
+		"R  old name.go -> new name.go",
+		" M doc/readme.md",
+		"?? notes.txt",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q:\n%s", want, text)
+		}
+	}
+	for _, gone := range []string{"modified:", "git restore", "Changes to be committed"} {
+		if strings.Contains(text, gone) {
+			t.Errorf("verbose text survived: %q", gone)
+		}
+	}
+	if !out.Lossy || len(text) >= len(statusFixture) {
+		t.Fatalf("compact output should be smaller and lossy: %d vs %d", len(text), len(statusFixture))
+	}
+}
+
+func TestRGElidesBeyondCaps(t *testing.T) {
+	var body strings.Builder
+	for f := 0; f < 12; f++ {
+		for m := 0; m < 20; m++ {
+			body.WriteString("src/dir")
+			body.WriteString(strconv.Itoa(f))
+			body.WriteString("/file.go:")
+			body.WriteString(strconv.Itoa(m + 1))
+			body.WriteString(":1:match payload ")
+			body.WriteString(strings.Repeat("x", 200))
+			body.WriteString("\n")
+		}
+	}
+	out, why := Run(rgFilter{aggressive: true}, Input{Stdout: []byte(body.String()), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	if !strings.Contains(text, "+2 more files, 40 matches hidden") {
+		t.Fatalf("missing hidden summary:\n%s", text)
+	}
+	if !out.Lossy || out.RemovedLines == 0 {
+		t.Fatalf("expected lossy output: %+v", out)
+	}
+	if strings.Count(text, "  ") < 200 {
+		t.Fatalf("expected 200 displayed matches")
+	}
+	if !strings.Contains(text, "...") {
+		t.Fatal("long match lines should be truncated")
+	}
+}
+
+func TestGitDiffDropsContext(t *testing.T) {
+	body := "diff --git a/x.txt b/x.txt\n" +
+		"index 111..222 100644\n" +
+		"--- a/x.txt\n" +
+		"+++ b/x.txt\n" +
+		"@@ -1,4 +1,4 @@\n" +
+		" context one\n" +
+		"-old line\n" +
+		"+new line\n" +
+		" context two\n"
+	out, why := Run(gitDiffFilter{}, Input{Stdout: []byte(body), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	for _, want := range []string{"diff --git", "@@ -1,4 +1,4 @@", "-old line", "+new line"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("lost %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "context one") || !out.Lossy {
+		t.Fatalf("context not elided: %+v\n%s", out, text)
+	}
+}
+
+func TestGoTestFailureOnly(t *testing.T) {
+	body := "=== RUN   TestPass\n=== PAUSE TestPass\n=== CONT  TestPass\n--- PASS: TestPass (0.00s)\n" +
+		"=== RUN   TestFail\n" +
+		"    fail_test.go:10: expected 42, got 41\n" +
+		"--- FAIL: TestFail (0.00s)\n" +
+		"    fail_test.go:11: stack detail\n" +
+		"FAIL\n" +
+		"FAIL\texample.com/p\t0.01s\n" +
+		"ok  \texample.com/ok\t0.01s\n"
+	out, why := Run(goTestFilter{aggressive: true}, Input{ExitCode: 1, Stdout: []byte(body), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	for _, want := range []string{"--- FAIL: TestFail", "expected 42, got 41", "stack detail", "FAIL\texample.com/p"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("lost %q:\n%s", want, text)
+		}
+	}
+	for _, gone := range []string{"TestPass", "=== RUN"} {
+		if strings.Contains(text, gone) {
+			t.Errorf("passing detail survived: %q", gone)
+		}
+	}
+}
+
+func TestGoTestJSONFailure(t *testing.T) {
+	body := strings.Join([]string{
+		`{"Action":"start","Package":"p"}`,
+		`{"Action":"run","Package":"p","Test":"TestPass"}`,
+		`{"Action":"pass","Package":"p","Test":"TestPass","Elapsed":0}`,
+		`{"Action":"run","Package":"p","Test":"TestFail"}`,
+		`{"Action":"output","Package":"p","Test":"TestFail","Output":"boom detail\n"}`,
+		`{"Action":"fail","Package":"p","Test":"TestFail","Elapsed":0.01}`,
+		`{"Action":"fail","Package":"p","Elapsed":0.02}`,
+	}, "\n") + "\n"
+	out, why := Run(goTestFilter{json: true, aggressive: true}, Input{ExitCode: 1, Stdout: []byte(body), Profile: "aggressive"})
+	if why != "" {
+		t.Fatalf("fallback: %s", why)
+	}
+	text := string(out.Text)
+	if !strings.Contains(text, "FAIL p TestFail") || !strings.Contains(text, "boom detail") {
+		t.Fatalf("candidate = %q", text)
+	}
+	if strings.Contains(text, "TestPass") {
+		t.Fatalf("passing test survived: %q", text)
 	}
 }

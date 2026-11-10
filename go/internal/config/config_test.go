@@ -29,7 +29,7 @@ func TestDefaults(t *testing.T) {
 		t.Fatalf("source = %q", l.Source)
 	}
 	c := l.Config
-	if c.SchemaVersion != 1 || c.Profile != "balanced" {
+	if c.SchemaVersion != 1 || c.Profile != "aggressive" {
 		t.Fatalf("bad defaults: %+v", c)
 	}
 	if c.Storage.RetentionHours != 24 || c.Storage.TotalMiB != 256 || !c.Storage.Enabled {

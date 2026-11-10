@@ -10,7 +10,8 @@ import (
 // goTestFilter folds successful test detail. Any failure signal, nonzero exit,
 // panic, race, or unknown event stream falls back to the original output.
 type goTestFilter struct {
-	json bool
+	json       bool
+	aggressive bool
 }
 
 func (f goTestFilter) ID() string {
@@ -22,14 +23,17 @@ func (f goTestFilter) ID() string {
 
 func (f goTestFilter) Apply(in Input) (Output, error) {
 	if f.json {
-		return applyGoTestJSON(in)
+		return applyGoTestJSON(in, f.aggressive)
 	}
-	return applyGoTestText(in)
+	return applyGoTestText(in, f.aggressive)
 }
 
-func applyGoTestText(in Input) (Output, error) {
+func applyGoTestText(in Input, aggressive bool) (Output, error) {
 	if in.ExitCode != 0 {
-		return Output{}, fmt.Errorf("nonzero exit")
+		if !aggressive {
+			return Output{}, fmt.Errorf("nonzero exit")
+		}
+		return applyGoTestFailures(in)
 	}
 	text := string(in.Stdout)
 	for _, marker := range []string{"--- FAIL", "panic:", "DATA RACE", "fatal error:", "build failed"} {
@@ -69,11 +73,11 @@ type goTestEvent struct {
 
 var knownGoActions = map[string]bool{
 	"start": true, "run": true, "pause": true, "cont": true,
-	"pass": true, "skip": true, "output": true,
+	"pass": true, "fail": true, "skip": true, "output": true,
 }
 
-func applyGoTestJSON(in Input) (Output, error) {
-	if in.ExitCode != 0 {
+func applyGoTestJSON(in Input, aggressive bool) (Output, error) {
+	if in.ExitCode != 0 && !aggressive {
 		return Output{}, fmt.Errorf("nonzero exit")
 	}
 	lines := splitLines(string(in.Stdout))
@@ -93,6 +97,7 @@ func applyGoTestJSON(in Input) (Output, error) {
 	var skips []skipInfo
 	skipSeen := map[string]bool{}
 	hidden := 0
+	var failed []goTestEvent
 
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
@@ -105,6 +110,9 @@ func applyGoTestJSON(in Input) (Output, error) {
 		if e.Action == "" || e.Package == "" || !knownGoActions[e.Action] {
 			return Output{}, fmt.Errorf("unknown event")
 		}
+		if e.Action == "fail" {
+			failed = append(failed, e)
+		}
 		if !seen[e.Package] {
 			seen[e.Package] = true
 			order = append(order, e.Package)
@@ -112,7 +120,9 @@ func applyGoTestJSON(in Input) (Output, error) {
 		key := e.Package + "\x00" + e.Test
 		switch e.Action {
 		case "fail":
-			return Output{}, fmt.Errorf("failed test event")
+			if !aggressive {
+				return Output{}, fmt.Errorf("failed test event")
+			}
 		case "run":
 			if e.Test != "" {
 				hidden++
@@ -152,6 +162,9 @@ func applyGoTestJSON(in Input) (Output, error) {
 	if len(order) == 0 {
 		return Output{}, fmt.Errorf("no packages")
 	}
+	if len(failed) > 0 {
+		return renderGoTestJSONFailures(order, failed, testOutput)
+	}
 	for _, pkg := range order {
 		if !finalPass[pkg] {
 			return Output{}, fmt.Errorf("missing terminal event for %s", pkg)
@@ -177,6 +190,130 @@ func applyGoTestJSON(in Input) (Output, error) {
 		return Output{}, fmt.Errorf("nothing to fold")
 	}
 	return Output{Text: joinLines(out), Lossy: true, RemovedLines: hidden}, nil
+}
+
+func applyGoTestFailures(in Input) (Output, error) {
+	text := string(in.Stdout)
+	if strings.Contains(text, "panic:") || strings.Contains(text, "DATA RACE") || strings.Contains(text, "fatal error:") {
+		return Output{}, fmt.Errorf("panic or race")
+	}
+	lines := splitLines(text)
+	type block struct{ start, end int }
+	var blocks []block
+	start := -1
+	flush := func(end int) {
+		if start >= 0 {
+			blocks = append(blocks, block{start, end})
+			start = -1
+		}
+	}
+	for i, line := range lines {
+		if strings.HasPrefix(line, "=== RUN") {
+			flush(i)
+			start = i
+		} else if isGoPackageSummary(line) {
+			flush(i)
+		}
+	}
+	flush(len(lines))
+
+	used := make([]bool, len(lines))
+	var out []string
+	removed := 0
+	failures := 0
+	for _, b := range blocks {
+		failed := false
+		for i := b.start; i < b.end; i++ {
+			trimmed := strings.TrimSpace(lines[i])
+			if strings.HasPrefix(trimmed, "--- FAIL:") {
+				failed = true
+			}
+		}
+		for i := b.start; i < b.end; i++ {
+			used[i] = true
+			line := lines[i]
+			trimmed := strings.TrimSpace(line)
+			switch {
+			case strings.HasPrefix(line, "=== RUN"), strings.HasPrefix(line, "=== PAUSE"),
+				strings.HasPrefix(line, "=== CONT"), strings.HasPrefix(line, "=== NAME"):
+				removed++
+			case strings.HasPrefix(trimmed, "--- PASS:"):
+				removed++
+			case !failed:
+				removed++
+			default:
+				if strings.HasPrefix(trimmed, "--- FAIL:") {
+					failures++
+				}
+				out = append(out, line)
+			}
+		}
+	}
+	for i, line := range lines {
+		if used[i] {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case isGoPackageSummary(line):
+			out = append(out, line)
+		case strings.HasPrefix(trimmed, "--- FAIL:"):
+			failures++
+			out = append(out, line)
+		case strings.HasPrefix(line, "=== RUN"), strings.HasPrefix(line, "=== PAUSE"),
+			strings.HasPrefix(line, "=== CONT"), strings.HasPrefix(line, "=== NAME"):
+			removed++
+		case strings.HasPrefix(trimmed, "--- PASS:"):
+			removed++
+		default:
+			out = append(out, line)
+		}
+	}
+	if failures == 0 {
+		return Output{}, fmt.Errorf("no failure block found")
+	}
+	return Output{Text: joinLines(out), Lossy: true, RemovedLines: removed}, nil
+}
+
+func isGoPackageSummary(line string) bool {
+	return strings.HasPrefix(line, "ok  \t") || strings.HasPrefix(line, "FAIL\t") ||
+		strings.HasPrefix(line, "?   \t") || line == "PASS" || line == "FAIL"
+}
+
+func renderGoTestJSONFailures(order []string, failed []goTestEvent, outputs map[string][]string) (Output, error) {
+	failedPackages := map[string]bool{}
+	var out []string
+	seen := map[string]bool{}
+	for _, e := range failed {
+		failedPackages[e.Package] = true
+		if e.Test == "" {
+			if !seen[e.Package] {
+				seen[e.Package] = true
+				out = append(out, "FAIL "+e.Package)
+			}
+			continue
+		}
+		key := e.Package + "\x00" + e.Test
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, "FAIL "+e.Package+" "+e.Test)
+		for _, l := range outputs[key] {
+			if strings.TrimSpace(l) != "" {
+				out = append(out, l)
+			}
+		}
+	}
+	if len(out) == 0 {
+		return Output{}, fmt.Errorf("no failed test")
+	}
+	for _, pkg := range order {
+		if !failedPackages[pkg] {
+			out = append(out, "ok  "+pkg)
+		}
+	}
+	return Output{Text: joinLines(out), Lossy: true, RemovedLines: len(failed)}, nil
 }
 
 func formatSeconds(v float64) string {

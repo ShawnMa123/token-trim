@@ -272,7 +272,7 @@ func (a *App) execCommand(tokens []string, forceRaw bool) int {
 	if res.StdoutCaptured {
 		var finalOut []byte
 		if sel != nil && !res.IncompleteOutput {
-			out, why := filter.Run(sel.Filter, filter.Input{Argv: childArgv, ExitCode: res.ExitCode, Stdout: res.Stdout})
+			out, why := filter.Run(sel.Filter, filter.Input{Argv: childArgv, ExitCode: res.ExitCode, Stdout: res.Stdout, Profile: profile})
 			switch {
 			case why != "":
 				fallbackReason = why
@@ -282,7 +282,7 @@ func (a *App) execCommand(tokens []string, forceRaw bool) int {
 				} else if _, err := resv.Commit(id, res.Stdout, res.Stderr, res.ExitCode, "utf-8"); err != nil {
 					fallbackReason = "recovery commit failed"
 				} else {
-					hint := fmt.Sprintf("[rtk-go: hidden=%d lines; recall=rtk-go recall %s]\n", out.RemovedLines, id)
+					hint := fmt.Sprintf("[rtk-go: -%d lines; recall %s]\n", out.RemovedLines, id)
 					if cand := filter.BuildCandidate(res.Stdout, out, hint); cand != nil {
 						finalOut = cand
 						mode = "filtered"
