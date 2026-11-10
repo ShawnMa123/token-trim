@@ -15,5 +15,6 @@ SKIP_BUILD=1 RUNS=$RUNS TAG=rtk-go-codex-e2e-entropy \
 
 RUNS=$RUNS ./run-fail.sh
 RUNS=$PYTEST_RUNS ./run-pytest.sh
+RUNS=3 ./run-fix.sh
 
 echo "done; see RESULTS.md and results*/ summaries"
