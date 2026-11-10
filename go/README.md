@@ -163,7 +163,7 @@ GOOS=windows GOARCH=amd64 go build ...               PASS (windows/amd64)
 go list -m all                   -> 仅主模块
 ```
 
-Go 1.25.14 交叉编译出的 `windows/amd64` 二进制已在本机 Windows 10 原生运行：`version` 报告 `go1.25.14 windows/amd64`，并通过真实 `git status` 过滤与 recall。本机 Go 1.26.4 的 `go test ./...`、`go vet ./...`、Windows Job Object 取消/孙进程回收测试仅作辅助验证，不替代 1.25 兼容证明。真实 `go test -json`、`go test -v`、Node 22 TAP 成功/失败输出完成端到端试跑。
+Go 1.25.14 容器内完整单测（82 个）、vet、race、Linux/Windows 交叉构建均通过；Windows 产物已在本机 Windows 10 原生运行。真实 `go test -json`、`go test -v`、Node 22 TAP、pytest 与 Codex+magpie 基准完成端到端验证。最新的三组 A/B/C 结果中 rtk-go token 降幅 29.1%/34.9%/17.5%，均高于原版 RTK 的 19.5%/34.2%/16.8%。
 
 过滤基准（Linux/amd64，Go 1.25.14）：
 
