@@ -100,6 +100,16 @@ Token 数据来自 Codex `turn.completed.usage.input_tokens`（包含系统提�
 pytest 单命令总量小，token 主要由固定系统提示构成；两者 token 基本持平，
 rtk-go 字节略低（237B vs 241B）。
 
+## E. 质量回归（bug fix）
+
+同一 fixture：120 个通过测试 + 1 个真实失败（`Add(2,3)` 错误），要求模型运行
+测试、修 `calc.go`、重跑到通过。3 个 arm × 3 轮，全部 **9/9 修复成功**，
+`go test ./...` 在独立容器复核通过。aggressive 失败摘要仍保留
+`Add(2,3) = -1, want 5`、失败测试名与包汇总，足以定位并修复。
+
+各轮命令数/模型路径不同，token 数字不用于节省对比；此项只验证事实保真与
+任务完成率没有回归。
+
 ## 性能（3 warm-up + 25 samples）
 
 ### 常规 fixture
