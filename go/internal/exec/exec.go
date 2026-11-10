@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -147,16 +148,19 @@ func Run(ctx context.Context, spec Spec) Result {
 	// Cancellation: host context or an output write failure tears down the
 	// whole tree; it never leaves descendants behind.
 	killOnce := sync.Once{}
-	kill := func(canceled bool) {
+	var canceled atomic.Bool
+	kill := func(byContext bool) {
 		killOnce.Do(func() {
 			tr.kill()
-			if canceled {
-				res.Canceled = true
+			if byContext {
+				canceled.Store(true)
 			}
 		})
 	}
 	stopWatch := make(chan struct{})
+	watchDone := make(chan struct{})
 	go func() {
+		defer close(watchDone)
 		select {
 		case <-ctx.Done():
 			kill(true)
@@ -170,6 +174,8 @@ func Run(ctx context.Context, spec Spec) Result {
 
 	waitErr := cmd.Wait()
 	close(stopWatch)
+	<-watchDone
+	res.Canceled = canceled.Load()
 	res.ExitCode = exitCode(cmd.ProcessState, waitErr)
 
 	var errMirrorErr error
