@@ -151,13 +151,14 @@ Go 1.25 容器（`golang:1.25-alpine`，实际 `go1.25.14 linux/amd64`，空模�
 
 ```text
 go test -mod=readonly ./...      PASS
+go test -race ./...              PASS（容器内临时安装 gcc/musl-dev）
 go vet -mod=readonly ./...       PASS
 go build -mod=readonly -trimpath ./cmd/rtk-go        PASS (linux/amd64)
 GOOS=windows GOARCH=amd64 go build ...               PASS (windows/amd64)
 go list -m all                   -> 仅主模块
 ```
 
-本机 Windows 10 x64（Go 1.26.4，仅辅助验证，不替代 1.25 兼容证明）：`go test ./...`、`go vet ./...`、Windows 原生二进制与 Job Object 取消/孙进程回收测试通过。真实 `git status`、`go test -v`、Node 22 TAP 成功/失败输出完成端到端试跑。
+Go 1.25.14 交叉编译出的 `windows/amd64` 二进制已在本机 Windows 10 原生运行：`version` 报告 `go1.25.14 windows/amd64`，并通过真实 `git status` 过滤与 recall。本机 Go 1.26.4 的 `go test ./...`、`go vet ./...`、Windows Job Object 取消/孙进程回收测试仅作辅助验证，不替代 1.25 兼容证明。真实 `go test -json`、`go test -v`、Node 22 TAP 成功/失败输出完成端到端试跑。
 
 过滤基准（Linux/amd64，Go 1.25.14）：
 

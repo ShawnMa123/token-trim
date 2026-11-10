@@ -546,6 +546,12 @@ func (a *App) runProbe() error {
 	if got.Env != "probe-value" {
 		return fmt.Errorf("probe env mismatch")
 	}
+	exitCmd := osexec.CommandContext(ctx, exe, "__probe-exit", "7")
+	if err := exitCmd.Run(); err == nil {
+		return fmt.Errorf("probe exit status was not preserved")
+	} else if ee, ok := err.(*osexec.ExitError); !ok || ee.ExitCode() != 7 {
+		return fmt.Errorf("probe exit status: %v", err)
+	}
 	return nil
 }
 

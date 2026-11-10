@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -68,6 +69,13 @@ func Run(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 			"env":  os.Getenv("RTK_GO_PROBE"),
 		})
 		return 0
+	case "__probe-exit":
+		if len(args) > 1 {
+			if code, err := strconv.Atoi(args[1]); err == nil {
+				return code
+			}
+		}
+		return 125
 	case "help", "-h", "--help":
 		a.usage()
 		return 0
