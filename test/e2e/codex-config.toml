@@ -1,0 +1,19 @@
+model = "my-qoder-local/DeepSeek-Flash"
+model_provider = "magpie"
+model_reasoning_effort = "low"
+request_max_retries = 3
+stream_max_retries = 3
+stream_idle_timeout_ms = 120000
+model_context_window = 200000
+model_auto_compact_token_limit = 180000
+tool_output_token_limit = 200000
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[model_providers.magpie]
+name = "magpie"
+base_url = "http://host.docker.internal:3425/v1"
+wire_api = "responses"
+experimental_bearer_token = "magpie"
+http_headers = { "x-openai-actor-authorization" = "magpie" }
+requires_openai_auth = true
