@@ -239,6 +239,3 @@ Go 1.25 兼容性用真实 `1.25.x` + `GOTOOLCHAIN=local` 验证；本机更高�
 
 详见 [`docs/security.md`](docs/security.md)。
 
-## License
-
-产品源码沿用本仓库的许可证；第三方说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
